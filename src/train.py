@@ -1,32 +1,31 @@
 # スクリプト本体
 import sys
+import numpy as np
+import cv2
+from typing import Tuple
+from pathlib import Path
 import torch
 from torch import Tensor
 from torch.utils import data
 from torch.optim import Adam
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.nn import MSELoss
-from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
-from tqdm import tqdm, trange
 import onnxruntime as ort
-import numpy as np
 import datetime
-from typing import Tuple
-from pathlib import Path
-import cv2
-from tqdm import tqdm
+from tqdm import tqdm, trange
 from utils.models import ESPCN4x
 from utils.datasets import TrainDataSet, ValidationDataSet
 
 # 学習パラメーター
 batch_size = 8
-num_workers = 0
+num_workers = 2
 num_epoch = 1
 learning_rate = 1e-3
 output_dir = Path("outputs/sample")
 output_dir.mkdir(exist_ok=True, parents=True)
 
+# データセットの取得
 def get_dataset() -> Tuple[TrainDataSet, ValidationDataSet]:
     return TrainDataSet(Path("./dataset/train"), 10), ValidationDataSet(Path("./dataset/validation/original"), Path("./dataset/validation/0.25x"))
 
@@ -35,7 +34,6 @@ def calc_psnr(image1: Tensor, image2: Tensor):
     to_image = transforms.ToPILImage()
     image1 = cv2.cvtColor((np.array(to_image(image1))).astype(np.uint8), cv2.COLOR_RGB2BGR)
     image2 = cv2.cvtColor((np.array(to_image(image2))).astype(np.uint8), cv2.COLOR_RGB2BGR)
-
     return cv2.PSNR(image1, image2)
 
 # 学習
@@ -47,9 +45,7 @@ def calc_psnr(image1: Tensor, image2: Tensor):
 # (この例では(1, 3, 128, 128)のダミー入力を設定後、shape[2]、shape[3]にdynamic_axesを設定することで、モデルの入力形状を(1, 3, height, width)としています。)
 def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = ESPCN4x()
-    model.to(device)
-    writer = SummaryWriter("log")
+    model = ESPCN4x().to(device)
     train_dataset, validation_dataset = get_dataset()
     train_data_loader = data.DataLoader(train_dataset,
                                 batch_size=batch_size,
@@ -97,15 +93,8 @@ def train():
                     validation_loss += loss.item() * low_resolution_image.size(0)
                     for image1, image2 in zip(output, high_resolution_image):   
                         validation_psnr += calc_psnr(image1, image2)
-            writer.add_scalar("train/loss", train_loss / len(train_dataset), epoch)
-            writer.add_scalar("train/psnr", train_psnr / len(train_dataset), epoch)
-            writer.add_scalar("validation/loss", validation_loss / len(validation_dataset), epoch)
-            writer.add_scalar("validation/psnr", validation_psnr / len(validation_dataset), epoch)
-            writer.add_image("output", output[0], epoch)
         except Exception as ex:
             print(f"EPOCH[{epoch}] ERROR: {ex}")
-
-    writer.close()
 
     # モデル生成
     torch.save(model.state_dict(), output_dir / "model.pth")
