@@ -11,6 +11,7 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.nn import MSELoss
 from torchvision import transforms
+from torch.cuda.amp import autocast, GradScaler
 import onnxruntime as ort
 import datetime
 from tqdm import tqdm, trange
@@ -24,10 +25,11 @@ num_epoch = 1
 learning_rate = 1e-3
 output_dir = Path("outputs/sample")
 output_dir.mkdir(exist_ok=True, parents=True)
+scaler = GradScaler()
 
 # データセットの取得
 def get_dataset() -> Tuple[TrainDataSet, ValidationDataSet]:
-    return TrainDataSet(Path("./dataset/train"), 10), ValidationDataSet(Path("./dataset/validation/original"), Path("./dataset/validation/0.25x"))
+    return TrainDataSet(Path("./dataset/train"), 850 * 10), ValidationDataSet(Path("./dataset/validation/original"), Path("./dataset/validation/0.25x"))
 
 # PSNR計算
 def calc_psnr(image1: Tensor, image2: Tensor):
@@ -62,6 +64,7 @@ def train():
     criterion = MSELoss()
 
     for epoch in trange(num_epoch, desc="EPOCH"):
+
         try:
             # 学習
             model.train()
@@ -73,13 +76,15 @@ def train():
                 low_resolution_image = low_resolution_image.to(device)
                 high_resolution_image = high_resolution_image.to(device)
                 optimizer.zero_grad()
-                output = model(low_resolution_image)
-                loss = criterion(output, high_resolution_image)
-                loss.backward()
+                with autocast(dtype=torch.float16):
+                    output = model(low_resolution_image)
+                    loss = criterion(output, high_resolution_image)
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
                 train_loss += loss.item() * low_resolution_image.size(0)
                 for image1, image2 in zip(output, high_resolution_image):   
                     train_psnr += calc_psnr(image1, image2)
-                optimizer.step()
             scheduler.step()
             
             # 検証
@@ -96,9 +101,9 @@ def train():
         except Exception as ex:
             print(f"EPOCH[{epoch}] ERROR: {ex}")
 
-    # モデル生成
-    torch.save(model.state_dict(), output_dir / "model.pth")
-
+        # モデル生成
+        torch.save(model.state_dict(), output_dir / "model.pth")
+    
     model.to(torch.device("cpu"))
     dummy_input = torch.randn(1, 3, 128, 128, device="cpu")
     torch.onnx.export(model, dummy_input, output_dir / "model.onnx",
