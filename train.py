@@ -1,14 +1,3 @@
-# 学習・モデル生成サンプルスクリプト
-# notebook(train.ipynb)と同じ内容です
-# 事前準備としてREADMEを参考に環境構築を行い、入手したデータセットを以下の形式で配置してください。
-# train.py
-# dataset/  # 配布しているデータセット
-# + train/
-# + validation/
-#   + 0.25x/
-#   + original/
-
-
 # 学習パラメーター
 batch_size = 50
 num_workers = 0
@@ -35,97 +24,8 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 import cv2
 from tqdm import tqdm
-
-
-# 4倍拡大サンプルモデル(ESPCN)の構造定義
-# 参考 https://github.com/Nhat-Thanh/ESPCN-Pytorch
-# モデルへの入力はN, C, H, Wの4次元入力で、チャンネルはR, G, Bの順、画素値は0~1に正規化されている想定となります。  
-# また、出力も同様のフォーマットで、縦横の解像度(H, W)が4倍となります。
-
-class ESPCN4x(nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-        self.scale = 4
-        self.conv_1 = nn.Conv2d(in_channels=1, out_channels=64, kernel_size=5, padding=2)
-        nn.init.normal_(self.conv_1.weight, mean=0, std=0.001)
-        nn.init.zeros_(self.conv_1.bias)
-
-        self.act = nn.ReLU()
-
-        self.conv_2 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, padding=1)
-        nn.init.normal_(self.conv_2.weight, mean=0, std=0.001)
-        nn.init.zeros_(self.conv_2.bias)
-        
-        self.conv_3 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
-        nn.init.normal_(self.conv_3.weight, mean=0, std=0.001)
-        nn.init.zeros_(self.conv_3.bias)
-
-        self.conv_4 = nn.Conv2d(in_channels=32, out_channels=(1 * self.scale * self.scale), kernel_size=3, padding=1)
-        nn.init.normal_(self.conv_4.weight, mean=0, std=0.001)
-        nn.init.zeros_(self.conv_4.bias)
-
-        self.pixel_shuffle = nn.PixelShuffle(self.scale)
-
-    def forward(self, X_in: tensor) -> tensor:
-        X = X_in.reshape(-1, 1, X_in.shape[-2], X_in.shape[-1])
-        X = self.act(self.conv_1(X))
-        X = self.act(self.conv_2(X))
-        X = self.act(self.conv_3(X))
-        X = self.conv_4(X)
-        X = self.pixel_shuffle(X)
-        X = X.reshape(-1, 3, X.shape[-2], X.shape[-1])
-        X_out = clip(X, 0.0, 1.0)
-        return X_out
-    
-# データセット定義
-# 提供されている学習用画像と評価用画像セット(高解像度＋低解像度)を読み出すクラスです。  
-# 学習用画像は元画像を512px四方に切り出し正解画像とします。また、正解画像を1/4に縮小したものを入力画像として用います(TrainDataSet)。  
-# 評価用画像は高解像度と低解像度がセットで提供されているため、低解像度のものを入力画像、高解像度のものを正解画像として用います(ValidationDataSet)。
-
-class DataSetBase(data.Dataset, ABC):
-    def __init__(self, image_path: Path):
-        self.images = list(image_path.iterdir())
-        self.max_num_sample = len(self.images)
-        
-    def __len__(self) -> int:
-        return self.max_num_sample
-    
-    @abstractmethod
-    def get_low_resolution_image(self, image: Image, path: Path)-> Image:
-        pass
-    
-    def preprocess_high_resolution_image(self, image: Image) -> Image:
-        return image
-    
-    def __getitem__(self, index) -> Tuple[Tensor, Tensor]:
-        image_path = self.images[index % len(self.images)]
-        high_resolution_image = self.preprocess_high_resolution_image(PIL.Image.open(image_path))
-        low_resolution_image = self.get_low_resolution_image(high_resolution_image, image_path)
-        return transforms.ToTensor()(low_resolution_image), transforms.ToTensor()(high_resolution_image)
-
-class TrainDataSet(DataSetBase):
-    def __init__(self, image_path: Path, num_image_per_epoch: int = 2000):
-        super().__init__(image_path)
-        self.max_num_sample = num_image_per_epoch
-
-    def get_low_resolution_image(self, image: Image, path: Path)-> Image:
-        return transforms.Resize((image.size[0] // 4, image.size[1] // 4), transforms.InterpolationMode.BICUBIC)(image.copy())
-    
-    def preprocess_high_resolution_image(self, image: Image) -> Image:
-        return transforms.Compose([
-            transforms.RandomCrop(size = 512),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomVerticalFlip()
-        ])(image)
-
-class ValidationDataSet(DataSetBase):
-    def __init__(self, high_resolution_image_path: Path, low_resolution_image_path: Path):
-        super().__init__(high_resolution_image_path)
-        self.high_resolution_image_path = high_resolution_image_path
-        self.low_resolution_image_path = low_resolution_image_path
-
-    def get_low_resolution_image(self, image: Image, path: Path)-> Image:
-        return PIL.Image.open(self.low_resolution_image_path / path.relative_to(self.high_resolution_image_path))
+from src.utils.models import ESPCN4x
+from src.utils.datasets import TrainDataSet, ValidationDataSet
 
 def get_dataset() -> Tuple[TrainDataSet, ValidationDataSet]:
     return TrainDataSet(Path("./dataset/train"), 850 * 10), ValidationDataSet(Path("./dataset/validation/original"), Path("./dataset/validation/0.25x"))
