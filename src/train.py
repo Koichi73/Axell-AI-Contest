@@ -5,10 +5,9 @@ num_epoch = 1
 learning_rate = 1e-3
 
 # スクリプト本体
-import os
 import sys
 import torch
-from torch import nn, clip, tensor, Tensor
+from torch import Tensor
 from torch.utils import data
 from torch.optim import Adam
 from torch.optim.lr_scheduler import MultiStepLR
@@ -20,10 +19,7 @@ import onnxruntime as ort
 import numpy as np
 import datetime
 from typing import Tuple
-import PIL
-from PIL.Image import Image
 from pathlib import Path
-from abc import ABC, abstractmethod
 import cv2
 from tqdm import tqdm
 from utils.models import ESPCN4x
