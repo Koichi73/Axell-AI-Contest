@@ -1,7 +1,7 @@
 # 学習パラメーター
 batch_size = 50
 num_workers = 0
-num_epoch = 100
+num_epoch = 1
 learning_rate = 1e-3
 
 # スクリプト本体
@@ -24,8 +24,8 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 import cv2
 from tqdm import tqdm
-from src.utils.models import ESPCN4x
-from src.utils.datasets import TrainDataSet, ValidationDataSet
+from utils.models import ESPCN4x
+from utils.datasets import TrainDataSet, ValidationDataSet
 
 def get_dataset() -> Tuple[TrainDataSet, ValidationDataSet]:
     return TrainDataSet(Path("./dataset/train"), 850 * 10), ValidationDataSet(Path("./dataset/validation/original"), Path("./dataset/validation/0.25x"))
@@ -126,8 +126,8 @@ def train():
 # 推論結果の画像はoutputフォルダーに生成されます。  
 # また、簡易的ですが、手元環境での処理時間の計測も行います。
 def inference_onnxruntime():
-    input_image_dir = Path("dataset/validation/0.25x")
-    output_image_dir = Path("output")
+    input_image_dir = Path("./dataset/validation/0.25x")
+    output_image_dir = Path("./outputs/sample/inference")
     output_image_dir.mkdir(exist_ok=True, parents=True)
 
     sess = ort.InferenceSession("model.onnx", providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
@@ -160,9 +160,9 @@ def inference_onnxruntime():
 # onnxruntimeで推論した結果の画像に対してPSNRの計測を行います。  
 # また、このスクリプトでは従来手法との比較も行います。 
 def calc_and_print_PSNR():
-    input_image_dir = Path("dataset/validation/0.25x")
-    output_image_dir = Path("output")
-    original_image_dir = Path("dataset/validation/original")
+    input_image_dir = Path("./dataset/validation/0.25x")
+    output_image_dir = Path("./outputs/sample/inference")
+    original_image_dir = Path("./dataset/validation/original")
     output_label = ["ESPCN", "NEAREST", "BILINEAR", "BICUBIC"]
     output_psnr = [0.0, 0.0, 0.0, 0.0]
     original_image_paths = list(original_image_dir.iterdir())
