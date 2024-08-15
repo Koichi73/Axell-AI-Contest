@@ -5,6 +5,8 @@ num_epoch = 1
 learning_rate = 1e-3
 
 # スクリプト本体
+import os
+import sys
 import torch
 from torch import nn, clip, tensor, Tensor
 from torch.utils import data
@@ -110,11 +112,12 @@ def train():
     writer.close()
 
     # モデル生成
-    torch.save(model.state_dict(), "model.pth")
+    os.makedirs("outputs/sample", exist_ok=True)
+    torch.save(model.state_dict(), "outputs/sample/model.pth")
 
     model.to(torch.device("cpu"))
     dummy_input = torch.randn(1, 3, 128, 128, device="cpu")
-    torch.onnx.export(model, dummy_input, "model.onnx", 
+    torch.onnx.export(model, dummy_input, "outputs/sample/model.onnx", 
                     opset_version=17,
                     input_names=["input"],
                     output_names=["output"],
@@ -130,7 +133,7 @@ def inference_onnxruntime():
     output_image_dir = Path("./outputs/sample/inference")
     output_image_dir.mkdir(exist_ok=True, parents=True)
 
-    sess = ort.InferenceSession("model.onnx", providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+    sess = ort.InferenceSession("outputs/sample/model.onnx", providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
     input_images = []
     output_images = []
     output_paths = []
