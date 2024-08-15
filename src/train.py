@@ -29,6 +29,9 @@ from tqdm import tqdm
 from utils.models import ESPCN4x
 from utils.datasets import TrainDataSet, ValidationDataSet
 
+output_dir = Path("outputs/sample")
+output_dir.mkdir(exist_ok=True, parents=True)
+
 def get_dataset() -> Tuple[TrainDataSet, ValidationDataSet]:
     return TrainDataSet(Path("./dataset/train"), 850 * 10), ValidationDataSet(Path("./dataset/validation/original"), Path("./dataset/validation/0.25x"))
 
@@ -112,12 +115,11 @@ def train():
     writer.close()
 
     # モデル生成
-    os.makedirs("outputs/sample", exist_ok=True)
-    torch.save(model.state_dict(), "outputs/sample/model.pth")
+    torch.save(model.state_dict(), output_dir / "model.pth")
 
     model.to(torch.device("cpu"))
     dummy_input = torch.randn(1, 3, 128, 128, device="cpu")
-    torch.onnx.export(model, dummy_input, "outputs/sample/model.onnx", 
+    torch.onnx.export(model, dummy_input, output_dir / "model.onnx",
                     opset_version=17,
                     input_names=["input"],
                     output_names=["output"],
@@ -130,10 +132,10 @@ def train():
 # また、簡易的ですが、手元環境での処理時間の計測も行います。
 def inference_onnxruntime():
     input_image_dir = Path("./dataset/validation/0.25x")
-    output_image_dir = Path("./outputs/sample/inference")
+    output_image_dir = output_dir / "inference"
     output_image_dir.mkdir(exist_ok=True, parents=True)
 
-    sess = ort.InferenceSession("outputs/sample/model.onnx", providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+    sess = ort.InferenceSession(output_dir / "model.onnx", providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
     input_images = []
     output_images = []
     output_paths = []
@@ -164,7 +166,7 @@ def inference_onnxruntime():
 # また、このスクリプトでは従来手法との比較も行います。 
 def calc_and_print_PSNR():
     input_image_dir = Path("./dataset/validation/0.25x")
-    output_image_dir = Path("./outputs/sample/inference")
+    output_image_dir = output_dir / "inference"
     original_image_dir = Path("./dataset/validation/original")
     output_label = ["ESPCN", "NEAREST", "BILINEAR", "BICUBIC"]
     output_psnr = [0.0, 0.0, 0.0, 0.0]
