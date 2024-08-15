@@ -1,9 +1,3 @@
-# 学習パラメーター
-batch_size = 50
-num_workers = 0
-num_epoch = 1
-learning_rate = 1e-3
-
 # スクリプト本体
 import sys
 import torch
@@ -25,11 +19,24 @@ from tqdm import tqdm
 from utils.models import ESPCN4x
 from utils.datasets import TrainDataSet, ValidationDataSet
 
+# 学習パラメーター
+batch_size = 8
+num_workers = 0
+num_epoch = 1
+learning_rate = 1e-3
 output_dir = Path("outputs/sample")
 output_dir.mkdir(exist_ok=True, parents=True)
 
 def get_dataset() -> Tuple[TrainDataSet, ValidationDataSet]:
-    return TrainDataSet(Path("./dataset/train"), 850 * 10), ValidationDataSet(Path("./dataset/validation/original"), Path("./dataset/validation/0.25x"))
+    return TrainDataSet(Path("./dataset/train"), 10), ValidationDataSet(Path("./dataset/validation/original"), Path("./dataset/validation/0.25x"))
+
+# PSNR計算
+def calc_psnr(image1: Tensor, image2: Tensor):
+    to_image = transforms.ToPILImage()
+    image1 = cv2.cvtColor((np.array(to_image(image1))).astype(np.uint8), cv2.COLOR_RGB2BGR)
+    image2 = cv2.cvtColor((np.array(to_image(image2))).astype(np.uint8), cv2.COLOR_RGB2BGR)
+
+    return cv2.PSNR(image1, image2)
 
 # 学習
 # 定義したモデルをpytorchで学習します。  
@@ -39,20 +46,10 @@ def get_dataset() -> Tuple[TrainDataSet, ValidationDataSet]:
 # この際、opset=17、モデルの入力名はinput、モデルの出力名はoutput、モデルの入力形状は(1, 3, height, width)となるように dynamic_axes を設定します。  
 # (この例では(1, 3, 128, 128)のダミー入力を設定後、shape[2]、shape[3]にdynamic_axesを設定することで、モデルの入力形状を(1, 3, height, width)としています。)
 def train():
-    to_image = transforms.ToPILImage()
-    def calc_psnr(image1: Tensor, image2: Tensor):
-        image1 = cv2.cvtColor((np.array(to_image(image1))).astype(np.uint8), cv2.COLOR_RGB2BGR)
-        image2 = cv2.cvtColor((np.array(to_image(image2))).astype(np.uint8), cv2.COLOR_RGB2BGR)
-
-        return cv2.PSNR(image1, image2)
-        
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     model = ESPCN4x()
     model.to(device)
     writer = SummaryWriter("log")
-
     train_dataset, validation_dataset = get_dataset()
     train_data_loader = data.DataLoader(train_dataset,
                                 batch_size=batch_size,
