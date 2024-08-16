@@ -178,7 +178,7 @@ def calc_and_print_PSNR(output_dir):
 def main(config_file):
     # Load the configuration file
     with open(config_file, 'r') as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)["voronoi"]
+        config = yaml.load(f, Loader=yaml.FullLoader)
 
     output_dir = Path(config["output_dir"])
     check_and_make_directory(output_dir)
