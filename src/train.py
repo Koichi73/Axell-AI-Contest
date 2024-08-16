@@ -180,10 +180,11 @@ def main(config_file):
     with open(config_file, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)["voronoi"]
 
-    check_and_make_directory(Path(config["output_dir"]))
-    train()
-    inference_onnxruntime()
-    calc_and_print_PSNR()
+    output_dir = Path(config["output_dir"])
+    check_and_make_directory(output_dir)
+    train(config["batch_size"], config["num_workers"], config["epochs"], config["lr"], Path(config["output_dir"]))
+    inference_onnxruntime(output_dir)
+    calc_and_print_PSNR(output_dir)
 
 if __name__ == "__main__":
     args = sys.argv
