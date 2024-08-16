@@ -16,7 +16,7 @@ from torch.cuda.amp import autocast, GradScaler
 import onnxruntime as ort
 import yaml
 import datetime
-from tqdm import tqdm, trange
+from tqdm import tqdm
 from utils.models import ESPCN4x
 from utils.datasets import TrainDataSet, ValidationDataSet
 
@@ -67,8 +67,7 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
     scheduler = MultiStepLR(optimizer, milestones=[30, 50, 65, 80, 90], gamma=0.7) 
     criterion = MSELoss()
 
-    for epoch in trange(epochs, desc="EPOCH"):
-
+    for epoch in range(epochs):
         try:
             # 学習
             model.train()
@@ -76,7 +75,7 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
             validation_loss = 0.0 
             train_psnr = 0.0
             validation_psnr = 0.0
-            for idx, (low_resolution_image, high_resolution_image ) in tqdm(enumerate(train_data_loader), desc=f"EPOCH[{epoch}] TRAIN", total=len(train_data_loader)):
+            for idx, (low_resolution_image, high_resolution_image ) in tqdm(enumerate(train_data_loader), desc=f"EPOCH[{epoch}/{epochs}] TRAIN", total=len(train_data_loader), leave=False):
                 low_resolution_image = low_resolution_image.to(device)
                 high_resolution_image = high_resolution_image.to(device)
                 optimizer.zero_grad()
