@@ -13,6 +13,7 @@ from torch.nn import MSELoss
 from torchvision import transforms
 from torch.cuda.amp import autocast, GradScaler
 import onnxruntime as ort
+from timm.scheduler import CosineLRScheduler
 import yaml
 import datetime
 from tqdm import tqdm
@@ -33,7 +34,7 @@ def calc_psnr(image1: Tensor, image2: Tensor):
     return cv2.PSNR(image1, image2)
 
 # 学習
-def train(model, device, batch_size, num_workers, epochs, lr, dataset_dir, output_dir, pretrained=None):
+def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset_dir, output_dir, pretrained=None):
     scaler = GradScaler()
     train_dataset, validation_dataset = get_dataset(dataset_dir)
     train_data_loader = data.DataLoader(train_dataset,
@@ -48,7 +49,10 @@ def train(model, device, batch_size, num_workers, epochs, lr, dataset_dir, outpu
     if pretrained is not None:
         model.load_state_dict(torch.load(pretrained))
     optimizer = Adam(model.parameters(), lr=lr)
-    scheduler = MultiStepLR(optimizer, milestones=[30, 50, 65, 80, 90], gamma=0.7) 
+    if scheduler == "cosine":
+        scheduler = CosineLRScheduler(optimizer, t_initial=epochs, lr_min=0.000005)
+    else:
+        scheduler = MultiStepLR(optimizer, milestones=[30, 50, 65, 80, 90], gamma=0.7) 
     criterion = MSELoss()
     train_losses, validation_losses, train_psnres, validation_psnres = [], [], [], []
     early_stopping = EarlyStopping(output_dir, patience=100)
@@ -192,7 +196,7 @@ def main(config_file):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = ESPCN4x().to(device)
     check_and_make_directory(output_dir)
-    train(model, device, config["batch_size"], config["num_workers"], config["epochs"], config["lr"], dataset_dir, output_dir)
+    train(model, device, config["batch_size"], config["num_workers"], config["epochs"], config["lr"], config["scheduler"], dataset_dir, output_dir)
     export_model_to_onnx(model, output_dir)
     inference_onnxruntime(dataset_dir, output_dir)
     calc_and_print_PSNR(dataset_dir, output_dir)
