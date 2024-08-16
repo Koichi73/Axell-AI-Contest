@@ -48,11 +48,11 @@ def visualize_batch(images, labels, save_dir, epoch, num_samples=5):
     for i in range(num_samples):
         plt.figure(figsize=(10, 5))
         plt.subplot(1, 2, 1)
-        plt.imshow(images[i].squeeze(0), cmap="gray")
+        plt.imshow(images[i].transpose(1, 2, 0))
         plt.axis('off')
 
         plt.subplot(1, 2, 2)
-        plt.imshow(labels[i].squeeze(0), cmap='gray')
+        plt.imshow(images[i].transpose(1, 2, 0))
         plt.axis('off')
 
         plt.savefig(save_dir / f'epoch{epoch}_sample{i}.png')
