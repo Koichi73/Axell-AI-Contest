@@ -33,15 +33,7 @@ def calc_psnr(image1: Tensor, image2: Tensor):
     return cv2.PSNR(image1, image2)
 
 # 学習
-# 定義したモデルをpytorchで学習します。  
-# バッチサイズなどのパラメーターはお使いのGPUのVRAMに合わせて調整をしてください。  
-# 学習時のログはlogフォルダーに保存されます。  
-# 学習後、ONNXモデルへ変換するためtorch.onnx.exportを呼び出しています。  
-# この際、opset=17、モデルの入力名はinput、モデルの出力名はoutput、モデルの入力形状は(1, 3, height, width)となるように dynamic_axes を設定します。  
-# (この例では(1, 3, 128, 128)のダミー入力を設定後、shape[2]、shape[3]にdynamic_axesを設定することで、モデルの入力形状を(1, 3, height, width)としています。)
-def train(batch_size, num_workers, epochs, lr, dataset_dir, output_dir):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = ESPCN4x().to(device)
+def train(model, device, batch_size, num_workers, epochs, lr, dataset_dir, output_dir):
     scaler = GradScaler()
     train_dataset, validation_dataset = get_dataset(dataset_dir)
     train_data_loader = data.DataLoader(train_dataset,
@@ -67,7 +59,6 @@ def train(batch_size, num_workers, epochs, lr, dataset_dir, output_dir):
 
     for epoch in range(start_epoch, epochs):
         try:
-            # 学習
             model.train()
             train_loss, validation_loss, train_psnr, validation_psnr = 0.0, 0.0, 0.0, 0.0
             for idx, (low_resolution_image, high_resolution_image ) in tqdm(enumerate(train_data_loader), desc=f"EPOCH[{epoch+1}/{epochs}] TRAIN", total=len(train_data_loader), leave=False):
@@ -105,7 +96,6 @@ def train(batch_size, num_workers, epochs, lr, dataset_dir, output_dir):
             validation_psnres.append(avarage_validation_psnr)
             
             print(f"EPOCH[{epoch+1}] TRAIN LOSS: {avarage_train_loss:.4f}, VALIDATION LOSS: {avarage_validation_loss:.4f}, TRAIN PSNR: {avarage_train_psnr:.4f}, VALIDATION PSNR: {avarage_validation_psnr:.4f}")
-            # torch.save(model.state_dict(), output_dir / "model.pth")
             early_stopping(avarage_validation_loss, model)
             if early_stopping.early_stop:
                 break
@@ -117,7 +107,13 @@ def train(batch_size, num_workers, epochs, lr, dataset_dir, output_dir):
             
         except Exception as ex:
             print(f"EPOCH[{epoch}] ERROR: {ex}")
-    
+
+# ONNXモデルへの変換
+# ONNXモデルへ変換するためtorch.onnx.exportを呼び出しています。  
+# この際、opset=17、モデルの入力名はinput、モデルの出力名はoutput、モデルの入力形状は(1, 3, height, width)となるように dynamic_axes を設定します。  
+# (この例では(1, 3, 128, 128)のダミー入力を設定後、shape[2]、shape[3]にdynamic_axesを設定することで、モデルの入力形状を(1, 3, height, width)としています。)
+def export_model_to_onnx(model, output_dir):
+    model.load_state_dict(torch.load(output_dir / "model.pth"))
     model.to(torch.device("cpu"))
     dummy_input = torch.randn(1, 3, 128, 128, device="cpu")
     torch.onnx.export(model, dummy_input, output_dir / "model.onnx",
@@ -125,7 +121,6 @@ def train(batch_size, num_workers, epochs, lr, dataset_dir, output_dir):
                     input_names=["input"],
                     output_names=["output"],
                     dynamic_axes={"input": {2: "height", 3:"width"}})
-
 
 # ONNXモデルによる推論(SIGNATE上で動作させるものと同等)
 # pytorchで学習・変換したモデルをonnxruntimeで推論して確認します。  
@@ -193,8 +188,11 @@ def main(config_file):
 
     dataset_dir = Path(config["dataset_dir"])
     output_dir = Path(config["output_dir"])
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = ESPCN4x().to(device)
     check_and_make_directory(output_dir)
-    train(config["batch_size"], config["num_workers"], config["epochs"], config["lr"], dataset_dir, output_dir)
+    train(model, device, config["batch_size"], config["num_workers"], config["epochs"], config["lr"], dataset_dir, output_dir)
+    export_model_to_onnx(model, output_dir)
     inference_onnxruntime(dataset_dir, output_dir)
     calc_and_print_PSNR(dataset_dir, output_dir)
 
