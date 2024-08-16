@@ -33,7 +33,7 @@ def calc_psnr(image1: Tensor, image2: Tensor):
     return cv2.PSNR(image1, image2)
 
 # 学習
-def train(model, device, batch_size, num_workers, epochs, lr, dataset_dir, output_dir):
+def train(model, device, batch_size, num_workers, epochs, lr, dataset_dir, output_dir, pretrained=None):
     scaler = GradScaler()
     train_dataset, validation_dataset = get_dataset(dataset_dir)
     train_data_loader = data.DataLoader(train_dataset,
@@ -45,7 +45,8 @@ def train(model, device, batch_size, num_workers, epochs, lr, dataset_dir, outpu
                                 batch_size=1,
                                 shuffle=False,
                                 num_workers=num_workers)
-
+    if pretrained is not None:
+        model.load_state_dict(torch.load(pretrained))
     optimizer = Adam(model.parameters(), lr=lr)
     scheduler = MultiStepLR(optimizer, milestones=[30, 50, 65, 80, 90], gamma=0.7) 
     criterion = MSELoss()
