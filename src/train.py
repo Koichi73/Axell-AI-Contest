@@ -17,6 +17,7 @@ import onnxruntime as ort
 import yaml
 import datetime
 from tqdm import tqdm
+import csv
 from utils.models import ESPCN4x
 from utils.datasets import TrainDataSet, ValidationDataSet
 
@@ -40,6 +41,14 @@ def check_and_make_directory(output_dir):
             print("The process was interrupted.")
             sys.exit(0)
     output_dir.mkdir(exist_ok=True, parents=True)
+
+def create_csv(train_losses, valid_losses, save_dir):
+    """Create a csv file"""
+    with open(save_dir / "losses.csv", mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Epochs', 'Train loss', 'Valid loss'])
+        for i, (train_loss, valid_loss) in enumerate(zip(train_losses, valid_losses)):
+            writer.writerow([i+1, train_loss, valid_loss])
 
 # 学習
 # 定義したモデルをpytorchで学習します。  
@@ -66,6 +75,8 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
     optimizer = Adam(model.parameters(), lr=lr)
     scheduler = MultiStepLR(optimizer, milestones=[30, 50, 65, 80, 90], gamma=0.7) 
     criterion = MSELoss()
+    train_losses = []
+    validation_losses = []
 
     for epoch in range(epochs):
         try:
@@ -75,7 +86,7 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
             validation_loss = 0.0 
             train_psnr = 0.0
             validation_psnr = 0.0
-            for idx, (low_resolution_image, high_resolution_image ) in tqdm(enumerate(train_data_loader), desc=f"EPOCH[{epoch}/{epochs}] TRAIN", total=len(train_data_loader), leave=False):
+            for idx, (low_resolution_image, high_resolution_image ) in tqdm(enumerate(train_data_loader), desc=f"EPOCH[{epoch+1}/{epochs}] TRAIN", total=len(train_data_loader), leave=False):
                 low_resolution_image = low_resolution_image.to(device)
                 high_resolution_image = high_resolution_image.to(device)
                 optimizer.zero_grad()
@@ -88,7 +99,8 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
                 train_loss += loss.item() * low_resolution_image.size(0)
                 for image1, image2 in zip(output, high_resolution_image):   
                     train_psnr += calc_psnr(image1, image2)
-            scheduler.step()
+            avarage_train_loss = train_loss / len(train_data_loader.dataset)
+            train_losses.append(avarage_train_loss)
             
             # 検証
             model.eval()
@@ -101,6 +113,11 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
                     validation_loss += loss.item() * low_resolution_image.size(0)
                     for image1, image2 in zip(output, high_resolution_image):   
                         validation_psnr += calc_psnr(image1, image2)
+            avarage_validation_loss = validation_loss / len(validation_data_loader.dataset)
+            validation_losses.append(avarage_validation_loss)
+
+            print(f"EPOCH[{epoch}] TRAIN LOSS: {avarage_train_loss:.4f}, VALIDATION LOSS: {avarage_validation_loss:.4f}, TRAIN PSNR: {train_psnr / len(train_data_loader.dataset):.4f}, VALIDATION PSNR: {validation_psnr / len(validation_data_loader.dataset):.4f}")
+            scheduler.step()
         except Exception as ex:
             print(f"EPOCH[{epoch}] ERROR: {ex}")
 
