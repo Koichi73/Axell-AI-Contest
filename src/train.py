@@ -140,10 +140,11 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
     scheduler = MultiStepLR(optimizer, milestones=[30, 50, 65, 80, 90], gamma=0.7) 
     criterion = MSELoss()
     train_losses, validation_losses, train_psnres, validation_psnres = [], [], [], []
-    start_epoch = 0
     if (output_dir / "checkpoint.pth").exists():
         start_epoch, model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres = load_checkpoint(model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres, output_dir / "checkpoint.pth")
         print(f"Loaded the checkpoint. Start epoch: {start_epoch+1}")
+    else:
+        start_epoch = 0
 
     for epoch in range(start_epoch, epochs):
         try:
@@ -184,7 +185,7 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
             validation_losses.append(avarage_validation_loss)
             validation_psnres.append(avarage_validation_psnr)
             
-            print(f"EPOCH[{epoch}] TRAIN LOSS: {avarage_train_loss:.4f}, VALIDATION LOSS: {avarage_validation_loss:.4f}, TRAIN PSNR: {avarage_train_psnr:.4f}, VALIDATION PSNR: {avarage_validation_psnr:.4f}")
+            print(f"EPOCH[{epoch+1}] TRAIN LOSS: {avarage_train_loss:.4f}, VALIDATION LOSS: {avarage_validation_loss:.4f}, TRAIN PSNR: {avarage_train_psnr:.4f}, VALIDATION PSNR: {avarage_validation_psnr:.4f}")
             torch.save(model.state_dict(), output_dir / "model.pth")
             scheduler.step()
             create_csv(train_losses, validation_losses, train_psnres, validation_psnres, output_dir)
