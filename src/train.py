@@ -191,7 +191,7 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
             create_csv(train_losses, validation_losses, train_psnres, validation_psnres, output_dir)
             plot_learning_curve(train_losses, validation_losses, output_dir)
             plot_psnr_curve(train_psnres, validation_psnres, output_dir)
-            save_checkpoint(epoch, model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres, output_dir)
+            save_checkpoint(epoch+1, model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres, output_dir)
             
         except Exception as ex:
             print(f"EPOCH[{epoch}] ERROR: {ex}")
