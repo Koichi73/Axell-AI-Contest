@@ -2,6 +2,7 @@
 import sys
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 from typing import Tuple
 from pathlib import Path
 import torch
@@ -39,6 +40,23 @@ def check_and_make_directory(output_dir):
             print("The process was interrupted.")
             sys.exit(0)
     output_dir.mkdir(exist_ok=True, parents=True)
+
+def visualize_batch(images, labels, save_dir, epoch, num_samples=5):
+    images = images.cpu().numpy()
+    labels = labels.cpu().numpy()
+
+    for i in range(num_samples):
+        plt.figure(figsize=(10, 5))
+        plt.subplot(1, 2, 1)
+        plt.imshow(images[i].squeeze(0), cmap="gray")
+        plt.axis('off')
+
+        plt.subplot(1, 2, 2)
+        plt.imshow(labels[i].squeeze(0), cmap='gray')
+        plt.axis('off')
+
+        plt.savefig(save_dir / f'epoch{epoch}_sample{i}.png')
+        plt.close()
 
 # 学習
 # 定義したモデルをpytorchで学習します。  
@@ -78,6 +96,8 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
             for idx, (low_resolution_image, high_resolution_image ) in tqdm(enumerate(train_data_loader), desc=f"EPOCH[{epoch}] TRAIN", total=len(train_data_loader)):
                 low_resolution_image = low_resolution_image.to(device)
                 high_resolution_image = high_resolution_image.to(device)
+                if idx == 0:
+                    visualize_batch(low_resolution_image, high_resolution_image, output_dir, epoch)
                 optimizer.zero_grad()
                 with autocast(dtype=torch.float16):
                     output = model(low_resolution_image)
