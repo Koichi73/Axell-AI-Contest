@@ -83,6 +83,36 @@ def plot_psnr_curve(train_psnres, validation_psnres, output_dir):
     epochs = range(1, len(train_psnres) + 1)
     plot_curve(epochs, [train_psnres, validation_psnres], ['Train PSNR', 'Valid PSNR'], 
                'Epochs', 'PSNR', output_dir / "psnr_curve.png")
+    
+# チェックポイントの保存
+def save_checkpoint(epoch, model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres, output_dir):
+    """Save a checkpoint"""
+    checkpoint = {
+        'epoch': epoch,
+        'model': model.state_dict(),
+        'optimizer': optimizer.state_dict(),
+        'scheduler': scheduler.state_dict(),
+        'scaler': scaler.state_dict(),
+        'train_losses': train_losses,
+        'valid_losses': validation_losses,
+        'train_psnres': train_psnres,
+        'valid_psnres': validation_psnres
+    }
+    torch.save(checkpoint, output_dir / 'checkpoint.pth')
+
+# チェックポイントの読み込み
+def load_checkpoint(model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres, checkpoint_path):
+    """Load a checkpoint"""
+    checkpoint = torch.load(checkpoint_path)
+    model.load_state_dict(checkpoint['model'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+    scheduler.load_state_dict(checkpoint['scheduler'])
+    scaler.load_state_dict(checkpoint['scaler'])
+    train_losses = checkpoint['train_losses']
+    validation_losses = checkpoint['valid_losses']
+    train_psnres = checkpoint['train_psnres']
+    validation_psnres = checkpoint['valid_psnres']
+    return checkpoint['epoch'], model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres
 
 # 学習
 # 定義したモデルをpytorchで学習します。  
@@ -110,8 +140,11 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
     scheduler = MultiStepLR(optimizer, milestones=[30, 50, 65, 80, 90], gamma=0.7) 
     criterion = MSELoss()
     train_losses, validation_losses, train_psnres, validation_psnres = [], [], [], []
+    start_epoch = 0
+    if (output_dir / "checkpoint.pth").exists():
+        start_epoch, model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres = load_checkpoint(model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres, output_dir / "checkpoint.pth")
 
-    for epoch in range(epochs):
+    for epoch in range(start_epoch, epochs):
         try:
             # 学習
             model.train()
@@ -151,16 +184,15 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
             validation_psnres.append(avarage_validation_psnr)
             
             print(f"EPOCH[{epoch}] TRAIN LOSS: {avarage_train_loss:.4f}, VALIDATION LOSS: {avarage_validation_loss:.4f}, TRAIN PSNR: {avarage_train_psnr:.4f}, VALIDATION PSNR: {avarage_validation_psnr:.4f}")
+            torch.save(model.state_dict(), output_dir / "model.pth")
             scheduler.step()
             create_csv(train_losses, validation_losses, train_psnres, validation_psnres, output_dir)
             plot_learning_curve(train_losses, validation_losses, output_dir)
             plot_psnr_curve(train_psnres, validation_psnres, output_dir)
+            save_checkpoint(epoch, model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres, output_dir)
             
         except Exception as ex:
             print(f"EPOCH[{epoch}] ERROR: {ex}")
-
-        # モデル生成
-        torch.save(model.state_dict(), output_dir / "model.pth")
     
     model.to(torch.device("cpu"))
     dummy_input = torch.randn(1, 3, 128, 128, device="cpu")
