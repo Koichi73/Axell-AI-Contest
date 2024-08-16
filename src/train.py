@@ -20,6 +20,7 @@ from tqdm import tqdm
 import csv
 from utils.models import ESPCN4x
 from utils.datasets import TrainDataSet, ValidationDataSet
+from torch.utils.tensorboard import SummaryWriter
 
 # データセットの取得
 def get_dataset() -> Tuple[TrainDataSet, ValidationDataSet]:
@@ -77,6 +78,7 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
     criterion = MSELoss()
     train_losses = []
     validation_losses = []
+    writer = SummaryWriter("log")
 
     for epoch in range(epochs):
         try:
@@ -99,7 +101,7 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
                 train_loss += loss.item() * low_resolution_image.size(0)
                 for image1, image2 in zip(output, high_resolution_image):   
                     train_psnr += calc_psnr(image1, image2)
-            avarage_train_loss = train_loss / len(train_data_loader.dataset)
+            avarage_train_loss = train_loss / len(train_data_loader)
             train_losses.append(avarage_train_loss)
             
             # 検証
@@ -113,11 +115,18 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
                     validation_loss += loss.item() * low_resolution_image.size(0)
                     for image1, image2 in zip(output, high_resolution_image):   
                         validation_psnr += calc_psnr(image1, image2)
-            avarage_validation_loss = validation_loss / len(validation_data_loader.dataset)
+            avarage_validation_loss = validation_loss / len(validation_data_loader)
             validation_losses.append(avarage_validation_loss)
 
             print(f"EPOCH[{epoch}] TRAIN LOSS: {avarage_train_loss:.4f}, VALIDATION LOSS: {avarage_validation_loss:.4f}, TRAIN PSNR: {train_psnr / len(train_data_loader.dataset):.4f}, VALIDATION PSNR: {validation_psnr / len(validation_data_loader.dataset):.4f}")
             scheduler.step()
+            create_csv(train_losses, validation_losses, output_dir)
+            
+            writer.add_scalar("train/loss", train_loss / len(train_dataset), epoch)
+            writer.add_scalar("train/psnr", train_psnr / len(train_dataset), epoch)
+            writer.add_scalar("validation/loss", validation_loss / len(validation_dataset), epoch)
+            writer.add_scalar("validation/psnr", validation_psnr / len(validation_dataset), epoch)
+            writer.add_image("output", output[0], epoch)
         except Exception as ex:
             print(f"EPOCH[{epoch}] ERROR: {ex}")
 
