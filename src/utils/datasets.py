@@ -15,10 +15,9 @@ from typing import Tuple
 class DataSetBase(data.Dataset, ABC):
     def __init__(self, image_path: Path):
         self.images = list(image_path.iterdir())
-        self.max_num_sample = len(self.images)
         
     def __len__(self) -> int:
-        return self.max_num_sample
+        return len(self.images)
     
     @abstractmethod
     def get_low_resolution_image(self, image: Image, path: Path)-> Image:
@@ -34,9 +33,8 @@ class DataSetBase(data.Dataset, ABC):
         return transforms.ToTensor()(low_resolution_image), transforms.ToTensor()(high_resolution_image)
 
 class TrainDataSet(DataSetBase):
-    def __init__(self, image_path: Path, num_image_per_epoch: int = 2000):
+    def __init__(self, image_path: Path):
         super().__init__(image_path)
-        self.max_num_sample = num_image_per_epoch
 
     def get_low_resolution_image(self, image: Image, path: Path)-> Image:
         return transforms.Resize((image.size[0] // 4, image.size[1] // 4), transforms.InterpolationMode.BICUBIC)(image.copy())

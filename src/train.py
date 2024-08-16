@@ -21,7 +21,7 @@ from utils.datasets import TrainDataSet, ValidationDataSet
 
 # データセットの取得
 def get_dataset() -> Tuple[TrainDataSet, ValidationDataSet]:
-    return TrainDataSet(Path("./dataset/train"), 850 * 10), ValidationDataSet(Path("./dataset/validation/original"), Path("./dataset/validation/0.25x"))
+    return TrainDataSet(Path("./dataset/train")), ValidationDataSet(Path("./dataset/validation/original"), Path("./dataset/validation/0.25x"))
 
 # PSNR計算
 def calc_psnr(image1: Tensor, image2: Tensor):
