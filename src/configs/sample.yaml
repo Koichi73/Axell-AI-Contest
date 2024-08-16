@@ -1,0 +1,11 @@
+description:
+  This is a sample configuration file for the project.
+
+batch_size: 8
+num_workers: 2
+epochs: 100
+output_dir: ./outputs/sample
+
+lr: 0.001
+scheduler:
+  name: null
