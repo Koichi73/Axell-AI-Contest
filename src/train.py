@@ -143,6 +143,7 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
     start_epoch = 0
     if (output_dir / "checkpoint.pth").exists():
         start_epoch, model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres = load_checkpoint(model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres, output_dir / "checkpoint.pth")
+        print(f"Loaded the checkpoint. Start epoch: {start_epoch+1}")
 
     for epoch in range(start_epoch, epochs):
         try:
@@ -170,7 +171,7 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
             # 検証
             model.eval()
             with torch.no_grad():
-                for idx, (low_resolution_image, high_resolution_image ) in tqdm(enumerate(validation_data_loader), desc=f"EPOCH[{epoch}] VALIDATION", total=len(validation_data_loader)):
+                for idx, (low_resolution_image, high_resolution_image ) in tqdm(enumerate(validation_data_loader), desc=f"EPOCH[{epoch+1}/{epochs}] VALIDATION", total=len(validation_data_loader)):
                     low_resolution_image = low_resolution_image.to(device)
                     high_resolution_image = high_resolution_image.to(device)
                     output = model(low_resolution_image)
