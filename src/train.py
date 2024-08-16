@@ -13,19 +13,11 @@ from torch.nn import MSELoss
 from torchvision import transforms
 from torch.cuda.amp import autocast, GradScaler
 import onnxruntime as ort
+import yaml
 import datetime
 from tqdm import tqdm, trange
 from utils.models import ESPCN4x
 from utils.datasets import TrainDataSet, ValidationDataSet
-
-# 学習パラメーター
-batch_size = 8
-num_workers = 2
-num_epoch = 1
-learning_rate = 1e-3
-output_dir = Path("outputs/sample")
-output_dir.mkdir(exist_ok=True, parents=True)
-scaler = GradScaler()
 
 # データセットの取得
 def get_dataset() -> Tuple[TrainDataSet, ValidationDataSet]:
@@ -38,6 +30,16 @@ def calc_psnr(image1: Tensor, image2: Tensor):
     image2 = cv2.cvtColor((np.array(to_image(image2))).astype(np.uint8), cv2.COLOR_RGB2BGR)
     return cv2.PSNR(image1, image2)
 
+# ディレクトリの存在確認と作成
+def check_and_make_directory(output_dir):
+    """Check if the output directory exists."""
+    if output_dir.exists():
+        answer = input(f"The directory '{output_dir}' already exists. Do you want to overwrite it? (y/n): ")
+        if answer.lower() != "y":
+            print("The process was interrupted.")
+            sys.exit(0)
+    output_dir.mkdir(exist_ok=True, parents=True)
+
 # 学習
 # 定義したモデルをpytorchで学習します。  
 # バッチサイズなどのパラメーターはお使いのGPUのVRAMに合わせて調整をしてください。  
@@ -45,9 +47,10 @@ def calc_psnr(image1: Tensor, image2: Tensor):
 # 学習後、ONNXモデルへ変換するためtorch.onnx.exportを呼び出しています。  
 # この際、opset=17、モデルの入力名はinput、モデルの出力名はoutput、モデルの入力形状は(1, 3, height, width)となるように dynamic_axes を設定します。  
 # (この例では(1, 3, 128, 128)のダミー入力を設定後、shape[2]、shape[3]にdynamic_axesを設定することで、モデルの入力形状を(1, 3, height, width)としています。)
-def train():
+def train(batch_size, num_workers, epochs, lr, output_dir):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = ESPCN4x().to(device)
+    scaler = GradScaler()
     train_dataset, validation_dataset = get_dataset()
     train_data_loader = data.DataLoader(train_dataset,
                                 batch_size=batch_size,
@@ -59,11 +62,11 @@ def train():
                                 shuffle=False,
                                 num_workers=num_workers)
 
-    optimizer = Adam(model.parameters(), lr=learning_rate)
+    optimizer = Adam(model.parameters(), lr=lr)
     scheduler = MultiStepLR(optimizer, milestones=[30, 50, 65, 80, 90], gamma=0.7) 
     criterion = MSELoss()
 
-    for epoch in trange(num_epoch, desc="EPOCH"):
+    for epoch in trange(epochs, desc="EPOCH"):
 
         try:
             # 学習
@@ -117,7 +120,7 @@ def train():
 # pytorchで学習・変換したモデルをonnxruntimeで推論して確認します。  
 # 推論結果の画像はoutputフォルダーに生成されます。  
 # また、簡易的ですが、手元環境での処理時間の計測も行います。
-def inference_onnxruntime():
+def inference_onnxruntime(output_dir):
     input_image_dir = Path("./dataset/validation/0.25x")
     output_image_dir = output_dir / "inference"
     output_image_dir.mkdir(exist_ok=True, parents=True)
@@ -151,7 +154,7 @@ def inference_onnxruntime():
 # PSNR計算(従来手法との比較付き)
 # onnxruntimeで推論した結果の画像に対してPSNRの計測を行います。  
 # また、このスクリプトでは従来手法との比較も行います。 
-def calc_and_print_PSNR():
+def calc_and_print_PSNR(output_dir):
     input_image_dir = Path("./dataset/validation/0.25x")
     output_image_dir = output_dir / "inference"
     original_image_dir = Path("./dataset/validation/original")
@@ -172,7 +175,26 @@ def calc_and_print_PSNR():
     for label, psnr in zip(output_label, output_psnr):
         print(f"{label}: {psnr / len(original_image_paths)}")
 
-if __name__ == "__main__":
+def main(config_file):
+    # Load the configuration file
+    with open(config_file, 'r') as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)["voronoi"]
+
+    check_and_make_directory(Path(config["output_dir"]))
     train()
     inference_onnxruntime()
     calc_and_print_PSNR()
+
+if __name__ == "__main__":
+    args = sys.argv
+    # Validate the arguments
+    if len(args) != 2:
+        raise ValueError("ValueError: The number of arguments is invalid.")
+    config_file = args[1]
+    if not Path(config_file).exists():
+        raise FileNotFoundError(f"File not found: {config_file}")
+    if not config_file.endswith('.yaml'):
+        raise ValueError("ValueError: The configuration file must be in yaml format.")
+    
+    # Run the main function
+    main(config_file)
