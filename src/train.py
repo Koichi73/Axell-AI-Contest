@@ -18,7 +18,6 @@ import onnxruntime as ort
 import yaml
 import datetime
 from tqdm import tqdm
-import csv
 from utils.models import ESPCN4x
 from utils.datasets import TrainDataSet, ValidationDataSet
 
@@ -59,6 +58,31 @@ def create_csv(train_losses, validation_losses, train_psnres, validation_psnres,
     })
     losses_df.to_csv(output_dir / "losses.csv", index=False)
     psnrs_df.to_csv(output_dir / "psnrs.csv", index=False)
+
+# グラフの作成
+def plot_curve(x_values, y_values, labels, xlabel, ylabel, output_path):
+    """General function to plot and save a curve"""
+    plt.plot(x_values, y_values[0], label=labels[0])
+    plt.plot(x_values, y_values[1], label=labels[1])
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.legend()
+    plt.savefig(output_path)
+    plt.close()
+
+# 学習曲線の作成
+def plot_learning_curve(train_losses, validation_losses, output_dir):
+    """Plot learning curve"""
+    epochs = range(1, len(train_losses) + 1)
+    plot_curve(epochs, [train_losses, validation_losses], ['Train Loss', 'Valid Loss'], 
+               'Epochs', 'Loss', output_dir / "learning_curve.png")
+
+# PSNR曲線の作成
+def plot_psnr_curve(train_psnres, validation_psnres, output_dir):
+    """Plot PSNR curve"""
+    epochs = range(1, len(train_psnres) + 1)
+    plot_curve(epochs, [train_psnres, validation_psnres], ['Train PSNR', 'Valid PSNR'], 
+               'Epochs', 'PSNR', output_dir / "psnr_curve.png")
 
 # 学習
 # 定義したモデルをpytorchで学習します。  
@@ -129,6 +153,8 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
             print(f"EPOCH[{epoch}] TRAIN LOSS: {avarage_train_loss:.4f}, VALIDATION LOSS: {avarage_validation_loss:.4f}, TRAIN PSNR: {avarage_train_psnr:.4f}, VALIDATION PSNR: {avarage_validation_psnr:.4f}")
             scheduler.step()
             create_csv(train_losses, validation_losses, train_psnres, validation_psnres, output_dir)
+            plot_learning_curve(train_losses, validation_losses, output_dir)
+            plot_psnr_curve(train_psnres, validation_psnres, output_dir)
             
         except Exception as ex:
             print(f"EPOCH[{epoch}] ERROR: {ex}")
