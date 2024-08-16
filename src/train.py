@@ -20,6 +20,7 @@ import datetime
 from tqdm import tqdm
 from utils.models import ESPCN4x
 from utils.datasets import TrainDataSet, ValidationDataSet
+from utils.early_stopping import EarlyStopping
 
 # データセットの取得
 def get_dataset() -> Tuple[TrainDataSet, ValidationDataSet]:
@@ -140,6 +141,8 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
     scheduler = MultiStepLR(optimizer, milestones=[30, 50, 65, 80, 90], gamma=0.7) 
     criterion = MSELoss()
     train_losses, validation_losses, train_psnres, validation_psnres = [], [], [], []
+    early_stopping = EarlyStopping(output_dir, patience=100)
+
     if (output_dir / "checkpoint.pth").exists():
         start_epoch, model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres = load_checkpoint(model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres, output_dir / "checkpoint.pth")
         print(f"Loaded the checkpoint. Start epoch: {start_epoch+1}")
@@ -186,7 +189,10 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
             validation_psnres.append(avarage_validation_psnr)
             
             print(f"EPOCH[{epoch+1}] TRAIN LOSS: {avarage_train_loss:.4f}, VALIDATION LOSS: {avarage_validation_loss:.4f}, TRAIN PSNR: {avarage_train_psnr:.4f}, VALIDATION PSNR: {avarage_validation_psnr:.4f}")
-            torch.save(model.state_dict(), output_dir / "model.pth")
+            # torch.save(model.state_dict(), output_dir / "model.pth")
+            early_stopping(avarage_validation_loss, model)
+            if early_stopping.early_stop:
+                break
             scheduler.step()
             create_csv(train_losses, validation_losses, train_psnres, validation_psnres, output_dir)
             plot_learning_curve(train_losses, validation_losses, output_dir)
