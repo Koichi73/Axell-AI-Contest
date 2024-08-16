@@ -1,9 +1,7 @@
 # スクリプト本体
 import sys
 import numpy as np
-import pandas as pd
 import cv2
-import matplotlib.pyplot as plt
 from typing import Tuple
 from pathlib import Path
 import torch
@@ -24,8 +22,8 @@ from utils.early_stopping import EarlyStopping
 from utils.train_helper import check_and_make_directory, load_checkpoint, save_checkpoint, create_csv, plot_learning_curve, plot_psnr_curve
 
 # データセットの取得
-def get_dataset() -> Tuple[TrainDataSet, ValidationDataSet]:
-    return TrainDataSet(Path("./dataset/train")), ValidationDataSet(Path("./dataset/validation/original"), Path("./dataset/validation/0.25x"))
+def get_dataset(dataset_dir) -> Tuple[TrainDataSet, ValidationDataSet]:
+    return TrainDataSet(dataset_dir / "train"), ValidationDataSet(dataset_dir / "validation/original", dataset_dir / "validation/0.25x")
 
 # PSNR計算
 def calc_psnr(image1: Tensor, image2: Tensor):
@@ -34,7 +32,6 @@ def calc_psnr(image1: Tensor, image2: Tensor):
     image2 = cv2.cvtColor((np.array(to_image(image2))).astype(np.uint8), cv2.COLOR_RGB2BGR)
     return cv2.PSNR(image1, image2)
 
-
 # 学習
 # 定義したモデルをpytorchで学習します。  
 # バッチサイズなどのパラメーターはお使いのGPUのVRAMに合わせて調整をしてください。  
@@ -42,11 +39,11 @@ def calc_psnr(image1: Tensor, image2: Tensor):
 # 学習後、ONNXモデルへ変換するためtorch.onnx.exportを呼び出しています。  
 # この際、opset=17、モデルの入力名はinput、モデルの出力名はoutput、モデルの入力形状は(1, 3, height, width)となるように dynamic_axes を設定します。  
 # (この例では(1, 3, 128, 128)のダミー入力を設定後、shape[2]、shape[3]にdynamic_axesを設定することで、モデルの入力形状を(1, 3, height, width)としています。)
-def train(batch_size, num_workers, epochs, lr, output_dir):
+def train(batch_size, num_workers, epochs, lr, dataset_dir, output_dir):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = ESPCN4x().to(device)
     scaler = GradScaler()
-    train_dataset, validation_dataset = get_dataset()
+    train_dataset, validation_dataset = get_dataset(dataset_dir)
     train_data_loader = data.DataLoader(train_dataset,
                                 batch_size=batch_size,
                                 shuffle=True,
@@ -134,8 +131,8 @@ def train(batch_size, num_workers, epochs, lr, output_dir):
 # pytorchで学習・変換したモデルをonnxruntimeで推論して確認します。  
 # 推論結果の画像はoutputフォルダーに生成されます。  
 # また、簡易的ですが、手元環境での処理時間の計測も行います。
-def inference_onnxruntime(output_dir):
-    input_image_dir = Path("./dataset/validation/0.25x")
+def inference_onnxruntime(dataset_dir, output_dir):
+    input_image_dir = dataset_dir / "validation/0.25x"
     output_image_dir = output_dir / "inference"
     output_image_dir.mkdir(exist_ok=True, parents=True)
 
@@ -168,10 +165,10 @@ def inference_onnxruntime(output_dir):
 # PSNR計算(従来手法との比較付き)
 # onnxruntimeで推論した結果の画像に対してPSNRの計測を行います。  
 # また、このスクリプトでは従来手法との比較も行います。 
-def calc_and_print_PSNR(output_dir):
-    input_image_dir = Path("./dataset/validation/0.25x")
+def calc_and_print_PSNR(dataset_dir, output_dir):
+    input_image_dir = dataset_dir / "validation/0.25x"
     output_image_dir = output_dir / "inference"
-    original_image_dir = Path("./dataset/validation/original")
+    original_image_dir = dataset_dir / "validation/original"
     output_label = ["ESPCN", "NEAREST", "BILINEAR", "BICUBIC"]
     output_psnr = [0.0, 0.0, 0.0, 0.0]
     original_image_paths = list(original_image_dir.iterdir())
@@ -194,11 +191,12 @@ def main(config_file):
     with open(config_file, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
+    dataset_dir = Path(config["dataset_dir"])
     output_dir = Path(config["output_dir"])
     check_and_make_directory(output_dir)
-    train(config["batch_size"], config["num_workers"], config["epochs"], config["lr"], Path(config["output_dir"]))
-    inference_onnxruntime(output_dir)
-    calc_and_print_PSNR(output_dir)
+    train(config["batch_size"], config["num_workers"], config["epochs"], config["lr"], dataset_dir, output_dir)
+    inference_onnxruntime(dataset_dir, output_dir)
+    calc_and_print_PSNR(dataset_dir, output_dir)
 
 if __name__ == "__main__":
     args = sys.argv
