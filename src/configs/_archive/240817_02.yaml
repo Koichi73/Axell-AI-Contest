@@ -1,0 +1,10 @@
+description:
+  ・schedulerを配布のものに
+
+dataset_dir: ./datasets/raw
+batch_size: 4
+num_workers: 2
+epochs: 100
+output_dir: ./outputs/240817_02
+lr: 0.001
+scheduler: null

@@ -1,0 +1,10 @@
+description:
+  ・cosineの調整
+
+dataset_dir: ./datasets/raw
+batch_size: 4
+num_workers: 2
+epochs: 100
+output_dir: ./outputs/240816_05
+lr: 0.0005
+scheduler: null
