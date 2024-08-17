@@ -4,7 +4,7 @@ __pycache__/
 
 .venv/
 .vscode/
-_archive/
+_handout/
 log/
 *.pdf
 .python-version
