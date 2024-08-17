@@ -32,6 +32,27 @@ class ESPCN4x(nn.Module):
         self.pixel_shuffle = nn.PixelShuffle(self.scale//2)
 
     def forward(self, X_in: tensor) -> tensor:
+        # 入力画像をデータ拡張する（左右反転、上下反転）
+        X_flip_lr = torch.flip(X_in, [3])  # 左右反転
+        X_flip_ud = torch.flip(X_in, [2])  # 上下反転
+        X_flip_lr_ud = torch.flip(X_in, [2, 3])  # 左右上下反転
+
+        # 4枚それぞれに対して推論を行う
+        X_orig = self._forward_once(X_in)
+        X_lr = self._forward_once(X_flip_lr)
+        X_ud = self._forward_once(X_flip_ud)
+        X_lr_ud = self._forward_once(X_flip_lr_ud)
+
+        # 元の向きに戻す
+        X_lr = torch.flip(X_lr, [3])
+        X_ud = torch.flip(X_ud, [2])
+        X_lr_ud = torch.flip(X_lr_ud, [2, 3])
+
+        # 4枚の結果を合成する
+        X_out = (X_orig + X_lr + X_ud + X_lr_ud) / 4.0
+        return X_out
+
+    def _forward_once(self, X_in: tensor) -> tensor:
         X = X_in.reshape(-1, 1, X_in.shape[-2], X_in.shape[-1])
         X = self.act(self.conv_1(X))
         X = self.act(self.conv_2(X))
