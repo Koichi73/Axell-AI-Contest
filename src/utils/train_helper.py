@@ -84,3 +84,21 @@ def load_checkpoint(model, optimizer, scheduler, scaler, train_losses, validatio
     train_psnres = checkpoint['train_psnres']
     validation_psnres = checkpoint['valid_psnres']
     return checkpoint['epoch'], model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres
+
+# transformの可視化
+def visualize_batch(images, labels, save_dir, epoch, num_samples=4):
+    images = images.cpu().numpy()
+    labels = labels.cpu().numpy()
+
+    for i in range(num_samples):
+        plt.figure(figsize=(10, 5))
+        plt.subplot(1, 2, 1)
+        plt.imshow(images[i].transpose(1, 2, 0))
+        plt.axis('off')
+
+        plt.subplot(1, 2, 2)
+        plt.imshow(labels[i].transpose(1, 2, 0))
+        plt.axis('off')
+
+        plt.savefig(save_dir / f'epoch{epoch}_sample{i}.png')
+        plt.close()

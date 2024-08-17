@@ -19,7 +19,7 @@ from tqdm import tqdm
 from utils.models import ESPCN4x
 from utils.datasets import TrainDataSet, ValidationDataSet
 from utils.early_stopping import EarlyStopping
-from utils.train_helper import check_and_make_directory, load_checkpoint, save_checkpoint, create_csv, plot_learning_curve, plot_psnr_curve
+from utils.train_helper import check_and_make_directory, load_checkpoint, save_checkpoint, create_csv, plot_learning_curve, plot_psnr_curve, visualize_batch
 
 # データセットの取得
 def get_dataset(dataset_dir) -> Tuple[TrainDataSet, ValidationDataSet]:
@@ -65,6 +65,8 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
             for idx, (low_resolution_image, high_resolution_image ) in tqdm(enumerate(train_data_loader), desc=f"EPOCH[{epoch+1}/{epochs}] TRAIN", total=len(train_data_loader), leave=False):
                 low_resolution_image = low_resolution_image.to(device)
                 high_resolution_image = high_resolution_image.to(device)
+                # if idx == 0:
+                #     visualize_batch(low_resolution_image, high_resolution_image, output_dir, epoch)
                 optimizer.zero_grad()
                 with autocast(dtype=torch.float16):
                     output = model(low_resolution_image)
