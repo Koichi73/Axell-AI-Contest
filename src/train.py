@@ -49,10 +49,7 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
     if pretrained is not None:
         model.load_state_dict(torch.load(pretrained))
     optimizer = Adam(model.parameters(), lr=lr)
-    if scheduler == "cosine":
-        scheduler = CosineLRScheduler(optimizer, t_initial=epochs, lr_min=0.000005)
-    else:
-        scheduler = MultiStepLR(optimizer, milestones=[30, 50, 65, 80, 90], gamma=0.7) 
+    scheduler = CosineLRScheduler(optimizer, t_initial=epochs, **scheduler)
     criterion = MSELoss()
     train_losses, validation_losses, train_psnres, validation_psnres = [], [], [], []
     early_stopping = EarlyStopping(output_dir, patience=100)
@@ -104,7 +101,7 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
             early_stopping(avarage_validation_loss, model)
             if early_stopping.early_stop:
                 break
-            scheduler.step()
+            scheduler.step(epoch)
             create_csv(train_losses, validation_losses, train_psnres, validation_psnres, output_dir)
             plot_learning_curve(train_losses, validation_losses, output_dir)
             plot_psnr_curve(train_psnres, validation_psnres, output_dir)
