@@ -11,7 +11,7 @@ import PIL
 from PIL import Image
 from torchvision import transforms
 from typing import Tuple
-from transforms import CutBlur
+from utils.transforms import CutBlur
 
 class DataSetBase(data.Dataset, ABC):
     def __init__(self, image_path: Path):

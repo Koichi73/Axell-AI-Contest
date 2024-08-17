@@ -2,14 +2,16 @@ import numpy as np
 from PIL import Image
 
 class CutBlur(object):
-    def __init__(self, prob=1, alpha=1.0):
+    def __init__(self, prob=0.5, alpha=1.0, cut_min=0.2, cut_max=0.5):
         """
         Args:
             prob (float): Cutblurを適用する確率
             alpha (float): 高解像度と低解像度のブレンド比率
         """
         self.prob = prob
-        self.alpha = alpha
+        # self.alpha = alpha
+        self.cut_min = cut_min
+        self.cut_max = cut_max
 
     def __call__(self, lr_img, hr_img):
         """
@@ -23,8 +25,7 @@ class CutBlur(object):
             return hr_img
 
         # Cutblurの領域をランダムに決定
-        cut_ratio = np.random.normal(loc=0.5, scale=0.1)
-        cut_ratio = np.clip(cut_ratio, 0, 1)
+        cut_ratio = np.random.uniform(self.cut_min, self.cut_max)
         w, h = hr_img.size
         ch, cw = int(h * cut_ratio), int(w * cut_ratio)
         cy = int(np.random.randint(0, h-ch+1))
