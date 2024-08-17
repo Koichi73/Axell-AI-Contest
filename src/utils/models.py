@@ -29,7 +29,7 @@ class ESPCN4x(nn.Module):
         nn.init.normal_(self.conv_4.weight, mean=0, std=0.001)
         nn.init.zeros_(self.conv_4.bias)
 
-        self.pixel_shuffle = nn.PixelShuffle(self.scale)
+        self.pixel_shuffle = nn.PixelShuffle(self.scale//2)
 
     def forward(self, X_in: tensor) -> tensor:
         X = X_in.reshape(-1, 1, X_in.shape[-2], X_in.shape[-1])
@@ -37,6 +37,7 @@ class ESPCN4x(nn.Module):
         X = self.act(self.conv_2(X))
         X = self.act(self.conv_3(X))
         X = self.conv_4(X)
+        X = self.pixel_shuffle(X)
         X = self.pixel_shuffle(X)
         X = X.reshape(-1, 3, X.shape[-2], X.shape[-1])
         X_out = clip(X, 0.0, 1.0)
