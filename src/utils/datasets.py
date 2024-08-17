@@ -11,6 +11,7 @@ import PIL
 from PIL import Image
 from torchvision import transforms
 from typing import Tuple
+from transforms import CutBlur
 
 class DataSetBase(data.Dataset, ABC):
     def __init__(self, image_path: Path):
@@ -26,15 +27,21 @@ class DataSetBase(data.Dataset, ABC):
     def preprocess_high_resolution_image(self, image: Image) -> Image:
         return image
     
+    @abstractmethod
+    def cutblurring(self, lr_image: Image, hr_image: Image):
+        pass
+
     def __getitem__(self, index) -> Tuple[Tensor, Tensor]:
         image_path = self.images[index % len(self.images)]
         high_resolution_image = self.preprocess_high_resolution_image(PIL.Image.open(image_path))
         low_resolution_image = self.get_low_resolution_image(high_resolution_image, image_path)
+        high_resolution_image = self.cutblurring(low_resolution_image, high_resolution_image)
         return transforms.ToTensor()(low_resolution_image), transforms.ToTensor()(high_resolution_image)
 
 class TrainDataSet(DataSetBase):
     def __init__(self, image_path: Path):
         super().__init__(image_path)
+        self.cutblur = CutBlur()
 
     def get_low_resolution_image(self, image: Image, path: Path)-> Image:
         return transforms.Resize((image.size[0] // 4, image.size[1] // 4), transforms.InterpolationMode.BICUBIC)(image.copy())
@@ -45,6 +52,9 @@ class TrainDataSet(DataSetBase):
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip()
         ])(image)
+    
+    def cutblurring(self, lr_image: Image, hr_image: Image):
+        return self.cutblur(lr_image, hr_image)
 
 class ValidationDataSet(DataSetBase):
     def __init__(self, high_resolution_image_path: Path, low_resolution_image_path: Path):
@@ -54,3 +64,6 @@ class ValidationDataSet(DataSetBase):
 
     def get_low_resolution_image(self, image: Image, path: Path)-> Image:
         return PIL.Image.open(self.low_resolution_image_path / path.relative_to(self.high_resolution_image_path))
+    
+    def cutblurring(self, lr_image: Image, hr_image: Image):
+        return hr_image
