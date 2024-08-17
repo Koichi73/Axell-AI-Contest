@@ -5,6 +5,7 @@
 
 import torch
 from torch import nn, tensor, clip
+from transformers import Swin2SRForImageSuperResolution
 
 class ESPCN4x(nn.Module):
     def __init__(self) -> None:
@@ -41,11 +42,6 @@ class ESPCN4x(nn.Module):
         X_out = clip(X, 0.0, 1.0)
         return X_out
 
-
-from transformers import Swin2SRForImageSuperResolution, Swin2SRImageProcessor
-from PIL import Image
-import numpy as np
-
 class Swin2SR(nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -53,21 +49,3 @@ class Swin2SR(nn.Module):
     
     def forward(self, x):
         return self.model(x)
-    
-processor = Swin2SRImageProcessor()
-model = Swin2SR()
-image_path = "datasets/sample/validation/0.25x/1.png"
-image = Image.open(image_path)
-pixel_values = processor(image, return_tensors="pt").pixel_values
-print(pixel_values.shape)
-
-import torch
-with torch.no_grad():
-    outputs = model(pixel_values)
-
-output = outputs.reconstruction.data.squeeze().float().cpu().clamp_(0, 1).numpy()
-output = np.moveaxis(output, source=0, destination=-1)
-output = (output * 255.0).round().astype(np.uint8)
-# save
-output_image = Image.fromarray(output)
-output_image.save("output.png")
