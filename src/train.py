@@ -97,7 +97,7 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
             validation_psnres.append(avarage_validation_psnr)
             
             print(f"EPOCH[{epoch+1}] TRAIN LOSS: {avarage_train_loss:.4f}, VALIDATION LOSS: {avarage_validation_loss:.6f}, TRAIN PSNR: {avarage_train_psnr:.4f}, VALIDATION PSNR: {avarage_validation_psnr:.4f}")
-            early_stopping(avarage_validation_loss, model)
+            early_stopping(avarage_validation_psnr, model)
             if early_stopping.early_stop:
                 break
             scheduler.step(epoch)

@@ -5,22 +5,19 @@ class EarlyStopping:
     def __init__(self, output_dir, patience):
         """
         Args:
-            save_dir (str): The directory where the model will be saved.
+            output_dir (str): The directory where the model will be saved.
             patience (int): The number of epochs to wait before early stopping.
-        
-        Parameters:
-            early_stop (bool): Whether to stop the training.
         """
         self.output_dir = Path(output_dir)
         self.patience = patience
         self.early_stop = False
         self._patience_counter = 0
-        self._best_loss = float('inf')
+        self._best_psnr = float('-inf')
         self._min_delta = 0.0
 
-    def __call__(self, valid_loss, model):
-        if valid_loss < self._best_loss - self._min_delta:
-            self._best_loss = valid_loss
+    def __call__(self, valid_psnr, model):
+        if valid_psnr > self._best_psnr - self._min_delta:
+            self._best_psnr = valid_psnr
             self._patience_counter = 0
             torch.save(model.state_dict(), self.output_dir / "model.pth")
         else:
