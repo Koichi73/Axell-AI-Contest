@@ -48,7 +48,7 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
     if pretrained is not None:
         model.load_state_dict(torch.load(pretrained))
     optimizer = Adam(model.parameters(), lr=lr)
-    scheduler = CosineLRScheduler(optimizer, t_initial=epochs, **scheduler)
+    scheduler = CosineLRScheduler(optimizer, **scheduler)
     criterion = MSELoss()
     train_losses, validation_losses, train_psnres, validation_psnres = [], [], [], []
     early_stopping = EarlyStopping(output_dir, patience=100)
