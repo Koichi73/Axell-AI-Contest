@@ -65,8 +65,6 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
             for idx, (low_resolution_image, high_resolution_image ) in tqdm(enumerate(train_data_loader), desc=f"EPOCH[{epoch+1}/{epochs}] TRAIN", total=len(train_data_loader), leave=False):
                 low_resolution_image = low_resolution_image.to(device)
                 high_resolution_image = high_resolution_image.to(device)
-                # if idx == 0:
-                #     visualize_batch(low_resolution_image, high_resolution_image, output_dir, epoch)
                 optimizer.zero_grad()
                 with autocast(dtype=torch.float16):
                     output = model(low_resolution_image)
@@ -116,7 +114,7 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
 # この際、opset=17、モデルの入力名はinput、モデルの出力名はoutput、モデルの入力形状は(1, 3, height, width)となるように dynamic_axes を設定します。  
 # (この例では(1, 3, 128, 128)のダミー入力を設定後、shape[2]、shape[3]にdynamic_axesを設定することで、モデルの入力形状を(1, 3, height, width)としています。)
 def export_model_to_onnx(model, output_dir):
-    model.load_state_dict(torch.load(output_dir / "model.pth"))
+    model.load_state_dict(torch.load(output_dir / "model.pth", weights_only=True))
     model.to(torch.device("cpu"))
     dummy_input = torch.randn(1, 3, 128, 128, device="cpu")
     torch.onnx.export(model, dummy_input, output_dir / "model.onnx",
@@ -193,8 +191,8 @@ def main(config_file):
     output_dir = Path(config["output_dir"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = ESPCN4x().to(device)
-    check_and_make_directory(output_dir)
-    train(model, device, config["batch_size"], config["num_workers"], config["epochs"], config["lr"], config["scheduler"], dataset_dir, output_dir)
+    # check_and_make_directory(output_dir)
+    # train(model, device, config["batch_size"], config["num_workers"], config["epochs"], config["lr"], config["scheduler"], dataset_dir, output_dir)
     export_model_to_onnx(model, output_dir)
     inference_onnxruntime(dataset_dir, output_dir)
     calc_and_print_PSNR(dataset_dir, output_dir)
