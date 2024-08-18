@@ -9,3 +9,4 @@ _handout/
 log/
 *.pdf
 .python-version
+yolov5s.pt
