@@ -32,25 +32,6 @@ class ESPCN4x(nn.Module):
         self.pixel_shuffle = nn.PixelShuffle(self.scale//2)
 
     def forward(self, X_in: tensor) -> tensor:
-        X_flip_lr = torch.flip(X_in, [3])
-        X_flip_ud = torch.flip(X_in, [2])
-        X_flip_lr_ud = torch.flip(X_in, [2, 3])
-
-        X_combined = torch.cat([X_in, X_flip_lr, X_flip_ud, X_flip_lr_ud], dim=0)
-        X_out_combined = self._forward_once(X_combined)
-
-        X_out_combined = X_out_combined.view(4, 1, *X_out_combined.shape[1:])
-        X_out_combined = X_out_combined.permute(1, 0, 2, 3, 4)
-
-        X_orig = X_out_combined[:, 0, :, :, :]
-        X_lr = torch.flip(X_out_combined[:, 1, :, :, :], [3])
-        X_ud = torch.flip(X_out_combined[:, 2, :, :, :], [2])
-        X_lr_ud = torch.flip(X_out_combined[:, 3, :, :, :], [2, 3])
-
-        X_out = (X_orig + X_lr + X_ud + X_lr_ud) / 4.0
-        return X_out
-
-    def _forward_once(self, X_in: tensor) -> tensor:
         X = X_in.reshape(-1, 1, X_in.shape[-2], X_in.shape[-1])
         X = self.act(self.conv_1(X))
         X = self.act(self.conv_2(X))
