@@ -1,0 +1,18 @@
+description:
+  ・div2k_no_person
+  ・DAを水平flipのみに
+  ・AdamW
+  ・モデルを拡張
+  
+dataset_dir: ./datasets/div2k_no_person
+batch_size: 4
+num_workers: 2
+epochs: 100
+output_dir: ./outputs/240820_05
+lr: 0.003
+scheduler:
+  t_initial: 100
+  lr_min: 0.00003
+  warmup_t: 10
+  warmup_lr_init: 0.00003
+  warmup_prefix: True
