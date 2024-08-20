@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 from torch import Tensor
 from torch.utils import data
-from torch.optim import Adam
+from torch.optim import Adam, AdamW
 from torch.nn import MSELoss
 from torchvision import transforms
 from torch.cuda.amp import autocast, GradScaler
@@ -47,7 +47,7 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
                                 num_workers=num_workers)
     if pretrained is not None:
         model.load_state_dict(torch.load(pretrained))
-    optimizer = Adam(model.parameters(), lr=lr)
+    optimizer = AdamW(model.parameters(), lr=lr)
     scheduler = CosineLRScheduler(optimizer, **scheduler)
     criterion = MSELoss()
     train_losses, validation_losses, train_psnres, validation_psnres = [], [], [], []
