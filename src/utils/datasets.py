@@ -50,7 +50,6 @@ class TrainDataSet(DataSetBase):
         return transforms.Compose([
             transforms.RandomCrop(size = 512),
             transforms.RandomHorizontalFlip(),
-            transforms.RandomVerticalFlip()
         ])(image)
     
     def cutblurring(self, lr_image: Image, hr_image: Image):
