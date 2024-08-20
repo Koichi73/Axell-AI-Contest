@@ -41,16 +41,4 @@ class CutBlur(object):
         hr_img = Image.fromarray(hr_img_np)
         return hr_img
 
-# 使用例
-if __name__ == "__main__":
-    # 高解像度と低解像度の画像を用意
-    lr_img = Image.open("datasets/raw/validation/0.25x/5.png")
-    hr_img = Image.open("datasets/raw/validation/original/5.png")
-
-    # CutBlurオブジェクトを作成
-    cutblur = CutBlur()
-
-    # # 画像にCutblurを適用
-    output_img = cutblur(lr_img, hr_img)
-    output_img.save("output.png")
 
