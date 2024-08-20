@@ -3,9 +3,7 @@
 # モデルへの入力はN, C, H, Wの4次元入力で、チャンネルはR, G, Bの順、画素値は0~1に正規化されている想定となります。  
 # また、出力も同様のフォーマットで、縦横の解像度(H, W)が4倍となります。
 
-import torch
 from torch import nn, tensor, clip
-from transformers import Swin2SRForImageSuperResolution
 
 class ESPCN4x(nn.Module):
     def __init__(self) -> None:
@@ -48,10 +46,7 @@ class ESPCN4x(nn.Module):
         X_out = clip(X, 0.0, 1.0)
         return X_out
 
-class Swin2SR(nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-        self.model = Swin2SRForImageSuperResolution.from_pretrained("caidas/swin2SR-classical-sr-x4-64")
-    
-    def forward(self, x):
-        return self.model(x)
+if __name__ == "__main__":
+    model = ESPCN4x()
+    total_params = sum(p.numel() for p in model.parameters())
+    print(f"モデルの総パラメータ数: {total_params}")
