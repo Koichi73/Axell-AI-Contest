@@ -35,7 +35,7 @@ class DataSetBase(data.Dataset, ABC):
         image_path = self.images[index % len(self.images)]
         high_resolution_image = self.preprocess_high_resolution_image(PIL.Image.open(image_path))
         low_resolution_image = self.get_low_resolution_image(high_resolution_image, image_path)
-        high_resolution_image = self.cutblurring(low_resolution_image, high_resolution_image)
+        # high_resolution_image = self.cutblurring(low_resolution_image, high_resolution_image)
         return transforms.ToTensor()(low_resolution_image), transforms.ToTensor()(high_resolution_image)
 
 class TrainDataSet(DataSetBase):
