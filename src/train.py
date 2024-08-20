@@ -12,6 +12,8 @@ from torch.nn import MSELoss
 from torchvision import transforms
 from torch.cuda.amp import autocast, GradScaler
 import onnxruntime as ort
+import onnx
+from onnxconverter_common import float16
 from timm.scheduler import CosineLRScheduler
 import yaml
 import datetime
@@ -47,7 +49,7 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
                                 num_workers=num_workers)
     if pretrained is not None:
         model.load_state_dict(torch.load(pretrained))
-    optimizer = AdamW(model.parameters(), lr=lr)
+    optimizer = AdamW(model.parameters(), lr=lr, weight_decay=1e-2)
     scheduler = CosineLRScheduler(optimizer, **scheduler)
     criterion = MSELoss()
     train_losses, validation_losses, train_psnres, validation_psnres = [], [], [], []
@@ -117,11 +119,14 @@ def export_model_to_onnx(model, output_dir):
     model.load_state_dict(torch.load(output_dir / "model.pth", weights_only=True))
     model.to(torch.device("cpu"))
     dummy_input = torch.randn(1, 3, 128, 128, device="cpu")
-    torch.onnx.export(model, dummy_input, output_dir / "model.onnx",
+    torch.onnx.export(model, dummy_input, output_dir / "model_fp32.onnx",
                     opset_version=17,
                     input_names=["input"],
                     output_names=["output"],
                     dynamic_axes={"input": {2: "height", 3:"width"}})
+    model_onnx = onnx.load(output_dir / "model_fp32.onnx")
+    model_fp16 = float16.convert_float_to_float16(model_onnx, keep_io_types=True)
+    onnx.save(model_fp16, output_dir / "model.onnx")
 
 # ONNXモデルによる推論(SIGNATE上で動作させるものと同等)
 # pytorchで学習・変換したモデルをonnxruntimeで推論して確認します。  
