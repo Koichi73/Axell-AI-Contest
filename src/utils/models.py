@@ -17,17 +17,17 @@ class ESPCN4x(nn.Module):
 
         self.act = nn.ReLU()
 
-        self.conv_2 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, padding=1)
+        self.conv_2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
         nn.init.normal_(self.conv_2.weight, mean=0, std=0.001)
         nn.init.zeros_(self.conv_2.bias)
         
-        self.conv_3 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
+        self.conv_3 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, padding=1)
         nn.init.normal_(self.conv_3.weight, mean=0, std=0.001)
         nn.init.zeros_(self.conv_3.bias)
 
-        # self.conv_3_2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
-        # nn.init.normal_(self.conv_3_2.weight, mean=0, std=0.001)
-        # nn.init.zeros_(self.conv_3_2.bias)
+        self.conv_3_2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
+        nn.init.normal_(self.conv_3_2.weight, mean=0, std=0.001)
+        nn.init.zeros_(self.conv_3_2.bias)
 
         self.conv_4 = nn.Conv2d(in_channels=32, out_channels=(1 * self.scale * self.scale), kernel_size=3, padding=1)
         nn.init.normal_(self.conv_4.weight, mean=0, std=0.001)
@@ -40,7 +40,7 @@ class ESPCN4x(nn.Module):
         X = self.act(self.conv_1(X))
         X = self.act(self.conv_2(X))
         X = self.act(self.conv_3(X))
-        # X = self.act(self.conv_3_2(X))
+        X = self.act(self.conv_3_2(X))
         X = self.conv_4(X)
         X = self.pixel_shuffle(X)
         X = self.pixel_shuffle(X)
