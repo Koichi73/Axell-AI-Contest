@@ -66,7 +66,7 @@ class ResidualBlock(nn.Module):
         return out
 
 class EDSR(nn.Module):
-    def __init__(self, num_residual_blocks=4, scale_factor=4) -> None:
+    def __init__(self, num_residual_blocks=8, scale_factor=4) -> None:
         super().__init__()
         self.scale = scale_factor
         self.conv_1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
@@ -123,6 +123,6 @@ class VDSR(nn.Module):
         return x_out
 
 if __name__ == "__main__":
-    model = ESPCN4x()
+    model = EDSR()
     total_params = sum(p.numel() for p in model.parameters())
     print(f"モデルの総パラメータ数: {total_params}")
