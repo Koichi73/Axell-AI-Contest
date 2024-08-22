@@ -10,7 +10,6 @@ from torch.utils import data
 from torch.optim import Adam, AdamW
 from torch.nn import MSELoss
 from torchvision import transforms
-from torch.cuda.amp import autocast, GradScaler
 import onnxruntime as ort
 import onnx
 from onnxconverter_common import float16
@@ -18,7 +17,7 @@ from timm.scheduler import CosineLRScheduler
 import yaml
 import datetime
 from tqdm import tqdm
-from utils.models import ESPCN4x
+from utils.models import ESPCN4x, EDSR, VDSR
 from utils.datasets import TrainDataSet, ValidationDataSet
 from utils.early_stopping import EarlyStopping
 from utils.train_helper import check_and_make_directory, load_checkpoint, save_checkpoint, create_csv, plot_learning_curve, plot_psnr_curve, visualize_batch
@@ -36,7 +35,7 @@ def calc_psnr(image1: Tensor, image2: Tensor):
 
 # 学習
 def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset_dir, output_dir, pretrained=None):
-    scaler = GradScaler()
+    scaler = torch.amp.GradScaler("cuda")
     train_dataset, validation_dataset = get_dataset(dataset_dir)
     train_data_loader = data.DataLoader(train_dataset,
                                 batch_size=batch_size,
@@ -68,7 +67,7 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
                 low_resolution_image = low_resolution_image.to(device)
                 high_resolution_image = high_resolution_image.to(device)
                 optimizer.zero_grad()
-                with autocast(dtype=torch.float16):
+                with torch.amp.autocast("cuda", dtype=torch.float16):
                     output = model(low_resolution_image)
                     loss = criterion(output, high_resolution_image)
                 scaler.scale(loss).backward()
