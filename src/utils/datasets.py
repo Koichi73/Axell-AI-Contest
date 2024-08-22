@@ -3,6 +3,7 @@
 # 学習用画像は元画像を512px四方に切り出し正解画像とします。また、正解画像を1/4に縮小したものを入力画像として用います(TrainDataSet)。  
 # 評価用画像は高解像度と低解像度がセットで提供されているため、低解像度のものを入力画像、高解像度のものを正解画像として用います(ValidationDataSet)。
 
+import numpy as np
 from torch import Tensor
 from torch.utils import data
 from abc import ABC, abstractmethod
@@ -11,7 +12,7 @@ import PIL
 from PIL import Image
 from torchvision import transforms
 from typing import Tuple
-from utils.transforms import CutBlur
+from utils.transforms import CutBlur, CutMix
 
 class DataSetBase(data.Dataset, ABC):
     def __init__(self, image_path: Path):
@@ -42,15 +43,23 @@ class TrainDataSet(DataSetBase):
     def __init__(self, image_path: Path):
         super().__init__(image_path)
         self.cutblur = CutBlur()
+        self.cutmix = CutMix(p=0.5, alpha=0.5)
 
     def get_low_resolution_image(self, image: Image, path: Path)-> Image:
         return transforms.Resize((image.size[0] // 4, image.size[1] // 4), transforms.InterpolationMode.BICUBIC)(image.copy())
     
     def preprocess_high_resolution_image(self, image: Image) -> Image:
+        ref_index = np.random.randint(0, len(self.images))
+        ref_image = PIL.Image.open(self.images[ref_index])
+
+        image = transforms.RandomCrop(size = 512)(image)
+        ref_image = transforms.RandomCrop(size = 512)(ref_image)
+
+        mixed_hr_image = self.cutmix(image, ref_image)
+
         return transforms.Compose([
-            transforms.RandomCrop(size = 512),
             transforms.RandomHorizontalFlip(),
-        ])(image)
+        ])(mixed_hr_image)
     
     def cutblurring(self, lr_image: Image, hr_image: Image):
         return self.cutblur(lr_image, hr_image)
