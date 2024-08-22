@@ -15,6 +15,7 @@ import onnx
 from onnxconverter_common import float16
 from timm.scheduler import CosineLRScheduler
 import yaml
+import time
 import datetime
 from tqdm import tqdm
 from utils.models import ESPCN4x, EDSR, VDSR
@@ -59,6 +60,7 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
         start_epoch, model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres = load_checkpoint(model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres, output_dir / "checkpoint.pth")
         print(f"Loaded the checkpoint. Start epoch: {start_epoch+1}")
 
+    start_time = time.time()
     for epoch in range(start_epoch, epochs):
         try:
             model.train()
@@ -109,6 +111,7 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
             
         except Exception as ex:
             print(f"EPOCH[{epoch}] ERROR: {ex}")
+    print(f"Training time: {time.time() - start_time}[s]")
 
 # ONNXモデルへの変換
 # ONNXモデルへ変換するためtorch.onnx.exportを呼び出しています。  
@@ -194,7 +197,7 @@ def main(config_file):
     dataset_dir = Path(config["dataset_dir"])
     output_dir = Path(config["output_dir"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = ESPCN4x().to(device)
+    model = EDSR().to(device)
     check_and_make_directory(output_dir)
     train(model, device, config["batch_size"], config["num_workers"], config["epochs"], config["lr"], config["scheduler"], dataset_dir, output_dir)
     export_model_to_onnx(model, output_dir)
