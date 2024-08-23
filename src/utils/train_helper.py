@@ -48,7 +48,7 @@ def plot_learning_curve(train_losses, validation_losses, output_dir):
     """Plot learning curve"""
     epochs = range(1, len(train_losses) + 1)
     plot_curve(epochs, [train_losses, validation_losses], ['Train Loss', 'Valid Loss'], 
-               'Epochs', 'Loss', output_dir / "learning_curve.png", ylim=[0, 0.012])
+               'Epochs', 'Loss', output_dir / "learning_curve.png", ylim=[0, 0.013])
 
 # PSNR曲線の作成
 def plot_psnr_curve(train_psnres, validation_psnres, output_dir):
