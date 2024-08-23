@@ -1,0 +1,16 @@
+description:
+  ・EDSR(num_residual_blocks=8)
+  ・CutMix
+  
+dataset_dir: ./datasets/div2k_no_person
+batch_size: 4
+num_workers: 2
+epochs: 100
+output_dir: ./outputs/240822_01
+lr: 0.0005
+scheduler:
+  t_initial: 100
+  lr_min: 0.000005
+  warmup_t: 10
+  warmup_lr_init: 0.000005
+  warmup_prefix: True
