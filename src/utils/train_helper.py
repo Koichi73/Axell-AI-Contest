@@ -31,12 +31,14 @@ def create_csv(train_losses, validation_losses, train_psnres, validation_psnres,
     psnrs_df.to_csv(output_dir / "psnrs.csv", index=False)
 
 # グラフの作成
-def plot_curve(x_values, y_values, labels, xlabel, ylabel, output_path):
+def plot_curve(x_values, y_values, labels, xlabel, ylabel, output_path, ylim=None):
     """General function to plot and save a curve"""
     plt.plot(x_values, y_values[0], label=labels[0])
     plt.plot(x_values, y_values[1], label=labels[1])
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
+    if ylim is not None:
+        plt.ylim(ylim)
     plt.legend()
     plt.savefig(output_path)
     plt.close()
@@ -46,7 +48,7 @@ def plot_learning_curve(train_losses, validation_losses, output_dir):
     """Plot learning curve"""
     epochs = range(1, len(train_losses) + 1)
     plot_curve(epochs, [train_losses, validation_losses], ['Train Loss', 'Valid Loss'], 
-               'Epochs', 'Loss', output_dir / "learning_curve.png")
+               'Epochs', 'Loss', output_dir / "learning_curve.png", ylim=[0, 0.012])
 
 # PSNR曲線の作成
 def plot_psnr_curve(train_psnres, validation_psnres, output_dir):
