@@ -68,9 +68,9 @@ class RCAN(nn.Module):
 
         # Upsampling layer
         self.upsampler = nn.Sequential(
-            nn.Conv2d(num_feat, num_feat * 4, kernel_size=3, padding=1, bias=True),
+            nn.Conv2d(num_feat, num_out_ch * 4 * 4, kernel_size=3, padding=1, bias=True),
             nn.PixelShuffle(2),
-            nn.Conv2d(num_feat, num_out_ch, kernel_size=3, padding=1, bias=True)
+            nn.PixelShuffle(2),
         )
 
     def forward(self, x):
