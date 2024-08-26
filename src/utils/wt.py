@@ -1,62 +1,64 @@
 import torch
 import torch.nn as nn
-import pywt
-import numpy as np
+import torch.nn.functional as F
 
 class DWTLayer(nn.Module):
     def __init__(self, wavelet='haar'):
         super(DWTLayer, self).__init__()
-        self.wavelet = wavelet
-    
+        # Haarウェーブレットフィルタの定義
+        self.filter_low = nn.Parameter(torch.tensor([[0.5, 0.5], [0.5, 0.5]]).unsqueeze(0).unsqueeze(0), requires_grad=False)
+        self.filter_high = nn.Parameter(torch.tensor([[-0.5, -0.5], [0.5, 0.5]]).unsqueeze(0).unsqueeze(0), requires_grad=False)
+
     def forward(self, x):
-        # PyTorchのテンソルをNumPy配列に変換
-        x_np = x.detach().cpu().numpy()
-        
-        # 各チャネルごとにDWTを適用し、12成分を取得
-        coeffs = []
-        for i in range(x_np.shape[1]):  # チャンネル数 (R, G, B)
-            cA, (cH, cV, cD) = pywt.dwt2(x_np[:, i, :, :], self.wavelet)
-            coeffs.append(cA)
-            coeffs.append(cH)
-            coeffs.append(cV)
-            coeffs.append(cD)
-        
-        # 12成分をまとめたテンソルを作成
-        coeffs_tensor = torch.tensor(np.stack(coeffs, axis=1)).to(x.device)
-        
-        return coeffs_tensor
+        # 各チャネルにフィルタを適用するため、適切に繰り返す
+        cA = F.conv2d(x, self.filter_low.repeat(x.size(1), 1, 1, 1), stride=2, groups=x.size(1))
+        cH = F.conv2d(x, self.filter_high.repeat(x.size(1), 1, 1, 1), stride=2, groups=x.size(1))
+        cV = F.conv2d(x, self.filter_low.transpose(2, 3).repeat(x.size(1), 1, 1, 1), stride=2, groups=x.size(1))
+        cD = F.conv2d(x, self.filter_high.transpose(2, 3).repeat(x.size(1), 1, 1, 1), stride=2, groups=x.size(1))
+
+        # 4つの成分をチャンネル方向に結合
+        out = torch.cat([cA, cH, cV, cD], dim=1)
+
+        return out
 
 class WITLayer(nn.Module):
     def __init__(self, wavelet='haar'):
         super(WITLayer, self).__init__()
-        self.wavelet = wavelet
-    
-    def forward(self, coeffs_tensor):
-        # TensorをNumPy配列に変換
-        coeffs_np = coeffs_tensor.detach().cpu().numpy()
+        # 逆変換用のフィルタ
+        self.filter_low = nn.Parameter(torch.tensor([[0.5, 0.5], [0.5, 0.5]]).unsqueeze(0).unsqueeze(0), requires_grad=False)
+        self.filter_high = nn.Parameter(torch.tensor([[-0.5, -0.5], [0.5, 0.5]]).unsqueeze(0).unsqueeze(0), requires_grad=False)
 
-        # 12チャンネルのテンソルをRGBごとの成分に分割
-        batch_size, _, height, width = coeffs_tensor.shape
-        restored_images = []
-        
-        for i in range(batch_size):
-            channels = []
-            for j in range(3):  # RGBの3チャンネル
-                # 各チャンネルに対応する4つの成分を取得
-                cA = coeffs_np[i, j * 4, :, :]
-                cH = coeffs_np[i, j * 4 + 1, :, :]
-                cV = coeffs_np[i, j * 4 + 2, :, :]
-                cD = coeffs_np[i, j * 4 + 3, :, :]
-                
-                # 逆ウェーブレット変換を適用
-                restored_channel = pywt.idwt2((cA, (cH, cV, cD)), self.wavelet)
-                channels.append(restored_channel)
-            
-            # RGBチャンネルを結合して1つの画像に
-            restored_image = np.stack(channels, axis=0)
-            restored_images.append(restored_image)
-        
-        # NumPy配列をTensorに変換
-        restored_images_tensor = torch.tensor(np.stack(restored_images)).to(coeffs_tensor.device)
-        
-        return restored_images_tensor
+    def forward(self, x):
+        batch_size, channels, height, width = x.size()
+        channels_per_group = channels // 4
+
+        # 各成分を分割
+        cA = x[:, 0:channels_per_group, :, :]
+        cH = x[:, channels_per_group:2*channels_per_group, :, :]
+        cV = x[:, 2*channels_per_group:3*channels_per_group, :, :]
+        cD = x[:, 3*channels_per_group:, :, :]
+
+        # 各成分を逆変換して元の解像度に戻す
+        up_cA = F.conv_transpose2d(cA, self.filter_low.repeat(channels_per_group, 1, 1, 1), stride=2, groups=channels_per_group)
+        up_cH = F.conv_transpose2d(cH, self.filter_high.repeat(channels_per_group, 1, 1, 1), stride=2, groups=channels_per_group)
+        up_cV = F.conv_transpose2d(cV, self.filter_low.transpose(2, 3).repeat(channels_per_group, 1, 1, 1), stride=2, groups=channels_per_group)
+        up_cD = F.conv_transpose2d(cD, self.filter_high.transpose(2, 3).repeat(channels_per_group, 1, 1, 1), stride=2, groups=channels_per_group)
+
+        # 各成分を足し合わせて再構成
+        restored = up_cA + up_cH + up_cV + up_cD
+
+        return restored
+
+if __name__ == "__main__":
+    # テスト用のダミーデータ
+    x = torch.randn(1, 3, 1500, 2248)
+    dwt = DWTLayer()
+    wit = WITLayer()
+
+    # DWT変換
+    y = dwt(x)
+    print(y.size())  # torch.Size([1, 48, 16, 16])
+
+    # WIT変換
+    z = wit(y)
+    print(z.size())  # torch.Size
