@@ -27,16 +27,11 @@ class DataSetBase(data.Dataset, ABC):
     
     def preprocess_high_resolution_image(self, image: Image) -> Image:
         return image
-    
-    @abstractmethod
-    def cutblurring(self, lr_image: Image, hr_image: Image):
-        pass
 
     def __getitem__(self, index) -> Tuple[Tensor, Tensor]:
         image_path = self.images[index % len(self.images)]
         high_resolution_image = self.preprocess_high_resolution_image(PIL.Image.open(image_path))
         low_resolution_image = self.get_low_resolution_image(high_resolution_image, image_path)
-        # high_resolution_image = self.cutblurring(low_resolution_image, high_resolution_image)
         return transforms.ToTensor()(low_resolution_image), transforms.ToTensor()(high_resolution_image)
 
 class TrainDataSet(DataSetBase):
@@ -49,20 +44,10 @@ class TrainDataSet(DataSetBase):
         return transforms.Resize((image.size[0] // 4, image.size[1] // 4), transforms.InterpolationMode.BICUBIC)(image.copy())
     
     def preprocess_high_resolution_image(self, image: Image) -> Image:
-        ref_index = np.random.randint(0, len(self.images))
-        ref_image = PIL.Image.open(self.images[ref_index])
-
-        image = transforms.RandomCrop(size = 512)(image)
-        ref_image = transforms.RandomCrop(size = 512)(ref_image)
-
-        mixed_hr_image = self.cutmix(image, ref_image)
-
         return transforms.Compose([
+            transforms.RandomCrop(size = 512),
             transforms.RandomHorizontalFlip(),
-        ])(mixed_hr_image)
-    
-    def cutblurring(self, lr_image: Image, hr_image: Image):
-        return self.cutblur(lr_image, hr_image)
+        ])(image)
 
 class ValidationDataSet(DataSetBase):
     def __init__(self, high_resolution_image_path: Path, low_resolution_image_path: Path):
@@ -72,6 +57,4 @@ class ValidationDataSet(DataSetBase):
 
     def get_low_resolution_image(self, image: Image, path: Path)-> Image:
         return PIL.Image.open(self.low_resolution_image_path / path.relative_to(self.high_resolution_image_path))
-    
-    def cutblurring(self, lr_image: Image, hr_image: Image):
-        return hr_image
+
