@@ -47,8 +47,6 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
                                 batch_size=1,
                                 shuffle=False,
                                 num_workers=num_workers)
-    if pretrained is not None:
-        model.load_state_dict(torch.load(pretrained))
     optimizer = AdamW(model.parameters(), lr=lr, weight_decay=1e-2)
     scheduler = CosineLRScheduler(optimizer, **scheduler)
     criterion = MSELoss()
@@ -78,8 +76,8 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
                 train_loss += loss.item() * low_resolution_image.size(0)
                 for image1, image2 in zip(output, high_resolution_image):   
                     train_psnr += calc_psnr(image1, image2)
-            avarage_train_loss = train_loss / len(train_data_loader)
-            avarage_train_psnr = train_psnr / len(train_data_loader)
+            avarage_train_loss = train_loss / len(train_data_loader.dataset)
+            avarage_train_psnr = train_psnr / len(train_data_loader.dataset)
             train_losses.append(avarage_train_loss)
             train_psnres.append(avarage_train_psnr)
             
@@ -94,8 +92,8 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
                     validation_loss += loss.item() * low_resolution_image.size(0)
                     for image1, image2 in zip(output, high_resolution_image):   
                         validation_psnr += calc_psnr(image1, image2)
-            avarage_validation_loss = validation_loss / len(validation_data_loader)
-            avarage_validation_psnr = validation_psnr / len(validation_data_loader)
+            avarage_validation_loss = validation_loss / len(validation_data_loader.dataset)
+            avarage_validation_psnr = validation_psnr / len(validation_data_loader.dataset)
             validation_losses.append(avarage_validation_loss)
             validation_psnres.append(avarage_validation_psnr)
             
