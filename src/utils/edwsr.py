@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from pytorch_wavelets import DWTForward, DWTInverse
-from models import EDSR
+from utils.models import EDSR
 
 class EDWSR(EDSR):
     def __init__(self):
@@ -21,8 +21,7 @@ class EDWSR(EDSR):
 
     def forward(self, x):
         orig_height, orig_width = x.size(2), x.size(3)
-        if orig_height % 2 != 0 or orig_width % 2 != 0:
-            x = torch.nn.functional.pad(x, (0, orig_width % 2, 0, orig_height % 2))
+        x = torch.nn.functional.pad(x, (0, orig_width % 2, 0, orig_height % 2))
 
         yl, yh = self.xfm(x)
         batch_size, _, height, width = yl.size()
@@ -39,13 +38,11 @@ class EDWSR(EDSR):
         x = self.pixel_shuffle(x)
 
         yl_reconstructed = x[:, :3, :, :]
-        yh_reconstructed = x[:, 3:, :, :].view(batch_size, 3, 3, height, width)
+        yh_reconstructed = x[:, 3:, :, :].view(batch_size, 3, 3, height * self.scale, width * self.scale)
         reconstructed_image = self.ifm((yl_reconstructed, [yh_reconstructed]))
-        out = torch.clamp(reconstructed_image, 0.0, 1.0)
+        reconstructed_image = reconstructed_image[:, :, :orig_height * self.scale, :orig_width * self.scale]
 
-        if orig_height % 2 != 0 or orig_width % 2 != 0:
-            out = out[:, :, :orig_height * 4, :orig_width * 4]
-        
+        out = torch.clamp(reconstructed_image, 0.0, 1.0)
         return out
 
 
