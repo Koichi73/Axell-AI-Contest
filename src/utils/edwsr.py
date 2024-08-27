@@ -20,8 +20,11 @@ class EDWSR(EDSR):
         nn.init.zeros_(self.conv_3.bias)
 
     def forward(self, x):
-        yl, yh = self.xfm(x)
+        orig_height, orig_width = x.size(2), x.size(3)
+        if orig_height % 2 != 0 or orig_width % 2 != 0:
+            x = torch.nn.functional.pad(x, (0, orig_width % 2, 0, orig_height % 2))
 
+        yl, yh = self.xfm(x)
         batch_size, _, height, width = yl.size()
         yh_reshaped = yh[0].view(batch_size, -1, height, width)
         combined = torch.cat((yl, yh_reshaped), dim=1)
@@ -39,6 +42,10 @@ class EDWSR(EDSR):
         yh_reconstructed = x[:, 3:, :, :].view(batch_size, 3, 3, height, width)
         reconstructed_image = self.ifm((yl_reconstructed, [yh_reconstructed]))
         out = torch.clamp(reconstructed_image, 0.0, 1.0)
+
+        if orig_height % 2 != 0 or orig_width % 2 != 0:
+            out = out[:, :, :orig_height * 4, :orig_width * 4]
+        
         return out
 
 
