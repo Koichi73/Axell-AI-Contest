@@ -20,7 +20,7 @@ class AWP:
         self.backup_eps = {}
 
     def attack_backward(self, inputs, label):
-        with torch.cuda.amp.autocast(enabled=False):
+        with torch.cuda.amp.autocast():
             self._save()
             self._attack_step()  # モデルを近傍の悪い方へ改変
             y_preds = self.model(inputs)
