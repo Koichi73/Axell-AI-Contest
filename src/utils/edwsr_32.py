@@ -6,39 +6,40 @@ from utils.models import EDSR, ResidualBlock
 class EDWSR(EDSR):
     def __init__(self):
         super(EDWSR, self).__init__()
-        self.xfm = DWTForward(J=1, wave='db1')
-        self.ifm = DWTInverse(mode='zero', wave='db1')
+        self.xfm = DWTForward(J=1, wave='db1', mode='zero')
+        self.ifm = DWTInverse(wave='db1', mode='zero')
 
         # 入力チャンネル数を12に変更
-        self.conv_1 = nn.Conv2d(in_channels=12, out_channels=64, kernel_size=3, padding=1)
+        self.conv_1 = nn.Conv2d(in_channels=12, out_channels=32, kernel_size=3, padding=1)
         nn.init.normal_(self.conv_1.weight, mean=0, std=0.001)
         nn.init.zeros_(self.conv_1.bias)
 
         # Residual blocks
         self.residual_blocks = nn.Sequential(
-            *[ResidualBlock(64) for _ in range(8)]
+            *[ResidualBlock(32) for _ in range(24)]
         )
 
-        # Second convolution layer
-        self.conv_2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
-        nn.init.normal_(self.conv_2.weight, mean=0, std=0.001)
-        nn.init.zeros_(self.conv_2.bias)
-
         # 出力チャンネル数を変更
-        self.conv_3 = nn.Conv2d(in_channels=64, out_channels=(12 * self.scale * self.scale), kernel_size=3, padding=1)
+        self.conv_3 = nn.Conv2d(in_channels=32, out_channels=(12 * self.scale * self.scale), kernel_size=3, padding=1)
         nn.init.normal_(self.conv_3.weight, mean=0, std=0.001)
         nn.init.zeros_(self.conv_3.bias)
 
     def forward(self, x):
         orig_height, orig_width = x.size(2), x.size(3)
-        x = torch.nn.functional.pad(x, (0, orig_width % 2, 0, orig_height % 2))
+        # x = torch.nn.functional.pad(x, (0, orig_width % 2, 0, orig_height % 2))
 
         yl, yh = self.xfm(x)
         batch_size, _, height, width = yl.size()
         yh_reshaped = yh[0].view(batch_size, -1, height, width)
         combined = torch.cat((yl, yh_reshaped), dim=1)
 
-        x = self.conv_1(combined)
+        min_vals = combined.amin(dim=[2, 3], keepdim=True)
+        max_vals = combined.amax(dim=[2, 3], keepdim=True)
+
+        # チャネルごとに正規化
+        normalized_combined = (combined - min_vals) / (max_vals - min_vals + 1e-8)
+
+        x = self.conv_1(normalized_combined)
         residual = x
         x = self.residual_blocks(x)
         x = self.conv_2(x)
@@ -47,8 +48,10 @@ class EDWSR(EDSR):
         x = self.pixel_shuffle(x)
         x = self.pixel_shuffle(x)
 
-        yl_reconstructed = x[:, :3, :, :]
-        yh_reconstructed = x[:, 3:, :, :].view(batch_size, 3, 3, height * self.scale, width * self.scale)
+        reconstructed_combined = x * (max_vals - min_vals) + min_vals
+
+        yl_reconstructed = reconstructed_combined[:, :3, :, :]
+        yh_reconstructed = reconstructed_combined[:, 3:, :, :].view(batch_size, 3, 3, height * self.scale, width * self.scale)
         reconstructed_image = self.ifm((yl_reconstructed, [yh_reconstructed]))
         reconstructed_image = reconstructed_image[:, :, :orig_height * self.scale, :orig_width * self.scale]
 
