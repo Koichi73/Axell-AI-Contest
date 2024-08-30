@@ -26,7 +26,7 @@ class EDWSR(EDSR):
 
     def forward(self, x):
         orig_height, orig_width = x.size(2), x.size(3)
-        # x = torch.nn.functional.pad(x, (0, orig_width % 2, 0, orig_height % 2))
+        x = torch.nn.functional.pad(x, (0, orig_width % 2, 0, orig_height % 2))
 
         yl, yh = self.xfm(x)
         batch_size, _, height, width = yl.size()

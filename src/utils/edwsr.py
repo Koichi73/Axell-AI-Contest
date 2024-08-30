@@ -16,7 +16,7 @@ class EDWSR(EDSR):
 
         # Residual blocks
         self.residual_blocks = nn.Sequential(
-            *[ResidualBlock(64) for _ in range(8)]
+            *[ResidualBlock(64) for _ in range(10)]
         )
 
         # Second convolution layer
@@ -38,6 +38,12 @@ class EDWSR(EDSR):
         yh_reshaped = yh[0].view(batch_size, -1, height, width)
         combined = torch.cat((yl, yh_reshaped), dim=1)
 
+        # min_vals = combined.amin(dim=[2, 3], keepdim=True)
+        # max_vals = combined.amax(dim=[2, 3], keepdim=True)
+
+        # # チャネルごとに正規化
+        # normalized_combined = (combined - min_vals) / (max_vals - min_vals + 1e-8)
+
         x = self.conv_1(combined)
         residual = x
         x = self.residual_blocks(x)
@@ -46,6 +52,8 @@ class EDWSR(EDSR):
         x = self.conv_3(x)
         x = self.pixel_shuffle(x)
         x = self.pixel_shuffle(x)
+
+        # reconstructed_combined = x * (max_vals - min_vals) + min_vals
 
         yl_reconstructed = x[:, :3, :, :]
         yh_reconstructed = x[:, 3:, :, :].view(batch_size, 3, 3, height * self.scale, width * self.scale)
