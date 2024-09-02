@@ -1,9 +1,3 @@
-# データセット定義
-# 提供されている学習用画像と評価用画像セット(高解像度＋低解像度)を読み出すクラスです。  
-# 学習用画像は元画像を512px四方に切り出し正解画像とします。また、正解画像を1/4に縮小したものを入力画像として用います(TrainDataSet)。  
-# 評価用画像は高解像度と低解像度がセットで提供されているため、低解像度のものを入力画像、高解像度のものを正解画像として用います(ValidationDataSet)。
-
-import numpy as np
 from torch import Tensor
 from torch.utils import data
 from abc import ABC, abstractmethod
@@ -12,7 +6,6 @@ import PIL
 from PIL import Image
 from torchvision import transforms
 from typing import Tuple
-from utils.transforms import CutBlur, CutMix
 
 class DataSetBase(data.Dataset, ABC):
     def __init__(self, image_path: Path):
@@ -37,8 +30,6 @@ class DataSetBase(data.Dataset, ABC):
 class TrainDataSet(DataSetBase):
     def __init__(self, image_path: Path):
         super().__init__(image_path)
-        self.cutblur = CutBlur()
-        self.cutmix = CutMix(p=0.5, alpha=0.5)
 
     def get_low_resolution_image(self, image: Image, path: Path)-> Image:
         return transforms.Resize((image.size[0] // 4, image.size[1] // 4), transforms.InterpolationMode.BICUBIC)(image.copy())
@@ -57,4 +48,3 @@ class ValidationDataSet(DataSetBase):
 
     def get_low_resolution_image(self, image: Image, path: Path)-> Image:
         return PIL.Image.open(self.low_resolution_image_path / path.relative_to(self.high_resolution_image_path))
-

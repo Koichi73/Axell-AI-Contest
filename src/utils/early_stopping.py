@@ -2,7 +2,7 @@ from pathlib import Path
 import torch
 
 class EarlyStopping:
-    def __init__(self, output_dir, patience):
+    def __init__(self, output_dir, patience=100):
         """
         Args:
             output_dir (str): The directory where the model will be saved.
