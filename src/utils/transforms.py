@@ -6,7 +6,8 @@ class CutBlur(object):
     def __init__(self, prob=1.0, alpha=0.7):
         """
         Args:
-            prob (float): Cutblurを適用する確率
+            prob (float): Probability of applying CutBlur.
+            alpha (float): The ratio of the size of the cut region.
         """
         self.prob = prob
         self.alpha = alpha
@@ -14,25 +15,25 @@ class CutBlur(object):
     def __call__(self, lr_img, hr_img):
         """
         Args:
-            lr_img (Image): 低解像度画像
-            hr_img (Image): 高解像度画像
+            lr_img (Image): Low-resolution image.
+            hr_img (Image): High-resolution image.
         Returns:
-            Image: Cutblurが適用された画像
+            Image: Image with CutBlur applied.
         """
         if np.random.rand() > self.prob:
             return hr_img
 
-        # Cutblurの領域をランダムに決定
+        # Determine the CutBlur region randomly
         cut_ratio = np.random.normal(self.alpha, 0.01)
         w, h = hr_img.size
         ch, cw = int(h * cut_ratio), int(w * cut_ratio)
         cy = int(np.random.randint(0, h-ch+1))
         cx = int(np.random.randint(0, w-cw+1))
 
-        # lr_imgのサイズをhr_imgに合わせる
+        # Resize lr_img to match hr_img
         lr_img = lr_img.resize((w, h), Image.BICUBIC)
         
-        # Cutblurを適用
+        # Apply CutBlur
         lr_img_np = np.array(lr_img)
         hr_img_np = np.array(hr_img)
         hr_img_np[cy:cy+ch, cx:cx+cw] = lr_img_np[cy:cy+ch, cx:cx+cw]
@@ -41,6 +42,11 @@ class CutBlur(object):
 
 class CutMix:
     def __init__(self, p: float = 1.0, alpha: float = 0.7):
+        """
+        Args:
+            p (float): Probability of applying CutMix.
+            alpha (float): The ratio of the size of the mixed region.
+        """
         self.p = p
         self.alpha = alpha
 
@@ -48,15 +54,14 @@ class CutMix:
         if random.random() >= self.p:
             return image
 
-        # 画像のサイズを取得
+        # Determine the CutMix region randomly
         w, h = image.size
         v = np.random.normal(self.alpha, 0.01)
         ch, cw = int(h * v), int(w * v)
-        # ランダムに領域を選択
+        # Randomly select the region of the image and the reference image
         fcy, fcx = random.randint(0, h - ch), random.randint(0, w - cw)
         tcy, tcx = random.randint(0, h - ch), random.randint(0, w - cw)
-        # 参照画像から選択した領域を取得
         ref_region = ref_image.crop((fcx, fcy, fcx + cw, fcy + ch))
-        # 元の画像の対応する領域に貼り付け
+        # Apply CutMix
         image.paste(ref_region, (tcx, tcy))
         return image
