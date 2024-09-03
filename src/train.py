@@ -1,8 +1,6 @@
-# スクリプト本体
 import sys
 import numpy as np
 import cv2
-from typing import Tuple
 from pathlib import Path
 import torch
 from torch import Tensor
@@ -18,23 +16,23 @@ import yaml
 import time
 import datetime
 from tqdm import tqdm
-from utils.models import EDSR
+from models import ESPCN, EDSR, EDWSR, Swin2SR
 from utils.datasets import TrainDataSet, ValidationDataSet
 from utils.early_stopping import EarlyStopping
 from utils.train_helper import check_and_make_directory, load_checkpoint, save_checkpoint, create_csv, plot_learning_curve, plot_psnr_curve, visualize_batch
 
-# データセットの取得
-def get_dataset(dataset_dir) -> Tuple[TrainDataSet, ValidationDataSet]:
+# Get the dataset
+def get_dataset(dataset_dir):
     return TrainDataSet(dataset_dir / "train"), ValidationDataSet(dataset_dir / "validation/original", dataset_dir / "validation/0.25x")
 
-# PSNR計算
+# Calculate the PSNR
 def calc_psnr(image1: Tensor, image2: Tensor):
     to_image = transforms.ToPILImage()
     image1 = cv2.cvtColor((np.array(to_image(image1))).astype(np.uint8), cv2.COLOR_RGB2BGR)
     image2 = cv2.cvtColor((np.array(to_image(image2))).astype(np.uint8), cv2.COLOR_RGB2BGR)
     return cv2.PSNR(image1, image2)
 
-# 学習
+# Training the model
 def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset_dir, output_dir, pretrained=None):
     scaler = torch.amp.GradScaler("cuda")
     train_dataset, validation_dataset = get_dataset(dataset_dir)
@@ -53,6 +51,9 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
     train_losses, validation_losses, train_psnres, validation_psnres = [], [], [], []
     early_stopping = EarlyStopping(output_dir, patience=100)
     start_epoch = 0
+
+    total_params = sum(p.numel() for p in model.parameters())
+    print(f"The total number of parameters in the model: {total_params}")
 
     if (output_dir / "checkpoint.pth").exists():
         start_epoch, model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres = load_checkpoint(model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres, output_dir / "checkpoint.pth")
@@ -81,7 +82,7 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
             train_losses.append(avarage_train_loss)
             train_psnres.append(avarage_train_psnr)
             
-            # 検証
+            # Validation
             model.eval()
             with torch.no_grad():
                 for idx, (low_resolution_image, high_resolution_image ) in tqdm(enumerate(validation_data_loader), desc=f"EPOCH[{epoch+1}/{epochs}] VALIDATION", total=len(validation_data_loader), leave=False):
@@ -111,10 +112,7 @@ def train(model, device, batch_size, num_workers, epochs, lr, scheduler, dataset
             print(f"EPOCH[{epoch}] ERROR: {ex}")
     print(f"Training time: {time.time() - start_time}[s]")
 
-# ONNXモデルへの変換
-# ONNXモデルへ変換するためtorch.onnx.exportを呼び出しています。  
-# この際、opset=17、モデルの入力名はinput、モデルの出力名はoutput、モデルの入力形状は(1, 3, height, width)となるように dynamic_axes を設定します。  
-# (この例では(1, 3, 128, 128)のダミー入力を設定後、shape[2]、shape[3]にdynamic_axesを設定することで、モデルの入力形状を(1, 3, height, width)としています。)
+# Export the model to ONNX
 def export_model_to_onnx(model, output_dir):
     model.load_state_dict(torch.load(output_dir / "model.pth", weights_only=True))
     model.to(torch.device("cpu"))
@@ -128,10 +126,7 @@ def export_model_to_onnx(model, output_dir):
     model_fp16 = float16.convert_float_to_float16(model_onnx, keep_io_types=True)
     onnx.save(model_fp16, output_dir / "model.onnx")
 
-# ONNXモデルによる推論(SIGNATE上で動作させるものと同等)
-# pytorchで学習・変換したモデルをonnxruntimeで推論して確認します。  
-# 推論結果の画像はoutputフォルダーに生成されます。  
-# また、簡易的ですが、手元環境での処理時間の計測も行います。
+# Inference using ONNX Runtime
 def inference_onnxruntime(dataset_dir, output_dir):
     input_image_dir = dataset_dir / "validation/0.25x"
     output_image_dir = output_dir / "inference"
@@ -163,29 +158,35 @@ def inference_onnxruntime(dataset_dir, output_dir):
 
     print(f"inference time: {(end_time - start_time).total_seconds() / len(input_images)}[s/image]")
 
-# PSNR計算(従来手法との比較付き)
-# onnxruntimeで推論した結果の画像に対してPSNRの計測を行います。  
-# また、このスクリプトでは従来手法との比較も行います。 
+# Calculate and print the PSNR
 def calc_and_print_PSNR(dataset_dir, output_dir):
     input_image_dir = dataset_dir / "validation/0.25x"
     output_image_dir = output_dir / "inference"
     original_image_dir = dataset_dir / "validation/original"
     output_label = ["ESPCN", "NEAREST", "BILINEAR", "BICUBIC"]
     output_psnr = [0.0, 0.0, 0.0, 0.0]
-    original_image_paths = list(original_image_dir.iterdir())
+    original_image_paths = sorted(original_image_dir.iterdir(), key=lambda x: int(x.stem))
+    psnr_list = []
     for image_path in tqdm(original_image_paths):
         input_image_path = input_image_dir / image_path.relative_to(original_image_dir)
         output_iamge_path = output_image_dir / image_path.relative_to(original_image_dir)
         input_image = cv2.imread(str(input_image_path))
         original_image = cv2.imread(str(image_path))
         espcn_image = cv2.imread(str(output_iamge_path))
-        output_psnr[0] += cv2.PSNR(original_image, espcn_image)
+        model_psnr = cv2.PSNR(original_image, espcn_image)
+        output_psnr[0] += model_psnr
+        psnr_list.append(model_psnr)
         h, w = original_image.shape[:2]
         output_psnr[1] += cv2.PSNR(original_image, cv2.resize(input_image, (w, h), interpolation=cv2.INTER_NEAREST))
         output_psnr[2] += cv2.PSNR(original_image, cv2.resize(input_image, (w, h), interpolation=cv2.INTER_LINEAR))
         output_psnr[3] += cv2.PSNR(original_image, cv2.resize(input_image, (w, h), interpolation=cv2.INTER_CUBIC))
     for label, psnr in zip(output_label, output_psnr):
         print(f"{label}: {psnr / len(original_image_paths)}")
+        # Save the PSNR to a CSV file
+    with open(output_dir / "psnr.csv", "w") as f:
+        f.write("image,PSNR\n")
+        for i in range(len(original_image_paths)):
+            f.write(f"{original_image_paths[i].name},{psnr_list[i]}\n")
 
 def main(config_file):
     # Load the configuration file
