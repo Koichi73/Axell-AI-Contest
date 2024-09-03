@@ -3,9 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import torch
 
-# ディレクトリの存在確認と作成
 def check_and_make_directory(output_dir):
-    """Check if the output directory exists."""
+    """Check if the output directory exists and create it if not."""
     if output_dir.exists():
         answer = input(f"The directory '{output_dir}' already exists. Do you want to overwrite it? (y/n): ")
         if answer.lower() != "y":
@@ -13,7 +12,6 @@ def check_and_make_directory(output_dir):
             sys.exit(0)
     output_dir.mkdir(exist_ok=True, parents=True)
 
-# CSVファイルの作成
 def create_csv(train_losses, validation_losses, train_psnres, validation_psnres, output_dir):
     """Create CSV files for losses and PSNRs using pandas"""
     epochs = list(range(1, len(train_losses) + 1))
@@ -30,7 +28,6 @@ def create_csv(train_losses, validation_losses, train_psnres, validation_psnres,
     losses_df.to_csv(output_dir / "losses.csv", index=False)
     psnrs_df.to_csv(output_dir / "psnrs.csv", index=False)
 
-# グラフの作成
 def plot_curve(x_values, y_values, labels, xlabel, ylabel, output_path, ylim=None):
     """General function to plot and save a curve"""
     plt.plot(x_values, y_values[0], label=labels[0])
@@ -43,21 +40,18 @@ def plot_curve(x_values, y_values, labels, xlabel, ylabel, output_path, ylim=Non
     plt.savefig(output_path)
     plt.close()
 
-# 学習曲線の作成
 def plot_learning_curve(train_losses, validation_losses, output_dir):
     """Plot learning curve"""
     epochs = range(1, len(train_losses) + 1)
     plot_curve(epochs, [train_losses, validation_losses], ['Train Loss', 'Valid Loss'], 
                'Epochs', 'Loss', output_dir / "learning_curve.png", ylim=[0, 0.013])
 
-# PSNR曲線の作成
 def plot_psnr_curve(train_psnres, validation_psnres, output_dir):
     """Plot PSNR curve"""
     epochs = range(1, len(train_psnres) + 1)
     plot_curve(epochs, [train_psnres, validation_psnres], ['Train PSNR', 'Valid PSNR'], 
                'Epochs', 'PSNR', output_dir / "psnr_curve.png")
-    
-# チェックポイントの保存
+
 def save_checkpoint(epoch, model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres, output_dir):
     """Save a checkpoint"""
     checkpoint = {
@@ -73,7 +67,6 @@ def save_checkpoint(epoch, model, optimizer, scheduler, scaler, train_losses, va
     }
     torch.save(checkpoint, output_dir / 'checkpoint.pth')
 
-# チェックポイントの読み込み
 def load_checkpoint(model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres, checkpoint_path):
     """Load a checkpoint"""
     checkpoint = torch.load(checkpoint_path)
@@ -87,20 +80,15 @@ def load_checkpoint(model, optimizer, scheduler, scaler, train_losses, validatio
     validation_psnres = checkpoint['valid_psnres']
     return checkpoint['epoch'], model, optimizer, scheduler, scaler, train_losses, validation_losses, train_psnres, validation_psnres
 
-# transformの可視化
 def visualize_batch(images, labels, save_dir, epoch, num_samples=4):
+    """Visualize a batch of images and labels."""
     images = images.cpu().numpy()
     labels = labels.cpu().numpy()
-
     for i in range(num_samples):
-        plt.figure(figsize=(10, 5))
-        plt.subplot(1, 2, 1)
-        plt.imshow(images[i].transpose(1, 2, 0))
-        plt.axis('off')
-
-        plt.subplot(1, 2, 2)
-        plt.imshow(labels[i].transpose(1, 2, 0))
-        plt.axis('off')
-
+        fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+        axes[0].imshow(images[i].transpose(1, 2, 0))
+        axes[0].axis('off')
+        axes[1].imshow(labels[i].transpose(1, 2, 0))
+        axes[1].axis('off')
         plt.savefig(save_dir / f'epoch{epoch}_sample{i}.png')
-        plt.close()
+        plt.close(fig)
