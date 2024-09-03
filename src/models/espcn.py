@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from common import create_conv_layer
+from models.common import create_conv_layer
 
 class ESPCN(nn.Module):
     """Efficient Sub-Pixel Convolutional Neural Network (ESPCN) model.
