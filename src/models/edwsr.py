@@ -12,8 +12,7 @@ class EDWSR(nn.Module):
     
     References:
         「ニューラルネットワークを用いた単一画像超解像のウェーブレット変換による高速化」
-        https://ipsj.ixsq.nii.ac.jp/ej/?action=repository_uri&item_id=212269&file_id=1&file_no=1
-        *Open the link to start downloading the PDF.
+        https://ipsj.ixsq.nii.ac.jp/ej/?action=pages_view_main&active_action=repository_view_main_item_detail&item_id=212269&item_no=1&page_id=13&block_id=8
     """
     def __init__(self, num_residual_blocks=10, scale_factor=4, wave='db1'):
         super(EDWSR, self).__init__()
